@@ -9,8 +9,10 @@ defmodule User do
         user
       {:get_struct,pid} ->
         send pid, {:user, user}
+        user
       {:set,key,value} ->
        Map.put(user,key,value)
+       user
       {:set_struct, struct} -> struct
     end
     new(user)

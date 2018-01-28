@@ -1,5 +1,7 @@
 defmodule GameMap do
-  def map() do
+  import GameUtilities
+
+  def generate_map() do
     map = ~w"""
     #=#=#=#=#@@@@
     #=#=#=#=#@@@@
@@ -15,15 +17,15 @@ defmodule GameMap do
     %{map: map, x: x, y: y}
   end
 
-  def move(location, user) do
+  def move(location) do
+    user = User.get_struct()
     where_to = move_to(location,user)
-    case verify_bounds(where_to,User.get(:map)) do
+    case verify_bounds(where_to,generate_map()) do
       {:ok, msg, {x,y}} ->
-        IO.puts IO.ANSI.green  <> msg
-        %User{ user | x: x, y: y}
+        IO.puts IO.ANSI.format([:green, msg]) 
+        User.set_struct(%User{ user | x: x, y: y})
         {:error, msg} ->
-          IO.puts IO.ANSI.red  <> msg
-          user
+          IO.puts IO.ANSI.red  <> msg <> IO.ANSI.reset
         end
       end
 
@@ -42,20 +44,12 @@ defmodule GameMap do
         {:error, "You are at the edge of the map and can't move further in this direction."}
       end
 
-      def show_map(%User{x: x, y: y}) do
-        map = map()
+      def show_map() do
+        %User{x: x, y: y} = User.get_struct()
+        map = generate_map()
         text = IO.ANSI.format_fragment([:bright, :green, get(map.map,   x - 1,    y - 1), :reset, :white])
         IO.write  IO.ANSI.format([:white, set(map.map, x - 1, y - 1, text  )])
       end
 
 
-      def get(arr, x, y) do
-        arr |> Enum.at(x) |> Enum.at(y)
-      end
-
-      def set(arr, x, y, value) do
-        List.replace_at(arr, x,
-        List.replace_at(Enum.at(arr, x), y, value)
-        )
-      end
     end

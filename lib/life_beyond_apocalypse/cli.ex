@@ -30,8 +30,8 @@ defmodule LifeBeyondApocalypse.CLI do
     IO.puts(@tag)
     name =  read_text("What is your name dear adventurer?")
     IO.puts "Welcome to LifeBeyondApocalypse #{name}!"
-    user = %User{name: name}
-    read_command("To get started type in a command, or help", user)
+    User.start(name)
+    read_command("To get started type in a command, or help")
   end
 
   defp read_text(text) do
@@ -39,44 +39,44 @@ defmodule LifeBeyondApocalypse.CLI do
      |> String.trim
   end
 
-  defp read_command(text \\ "", user) do
+  defp read_command(text \\ "") do
     IO.gets("\n#{text} > ")
     |> String.trim
     |> String.downcase
     |> String.split(" ")
-    |>  execute_command user
+    |>  execute_command
   end
 
-  defp execute_command(["quit"],_user) do
+  defp execute_command(["quit"]) do
     IO.puts "\nThanks for playing Life Beyond Apocalypse. Have a nice day!"
   end
-  defp execute_command(["help"],user) do
+  defp execute_command(["help"]) do
     print_help_message()
-    read_command(user)
+    read_command()
   end
 
-  defp execute_command(["move" | location],user) do
-    GameMap.move(List.to_string(location), user )
-    read_command(user)
+  defp execute_command(["move" | location]) do
+    GameMap.move(List.to_string(location) )
+    read_command()
   end
 
-  defp execute_command(["map"],user) do
-    GameMap.show_map(user)
-      read_command(user)
+  defp execute_command(["map"]) do
+    GameMap.show_map()
+      read_command()
   end
 
 
-  defp execute_command(_unknown,user) do
+  defp execute_command(_unknown) do
     IO.puts("\nUnknown command. Try help <topic>.")
     print_help_message()
-
-    read_command(user)
+    read_command()
   end
 
   defp print_help_message() do
     IO.puts("\nLife Beyond Apocalypse supports the following commands:\n")
     @commands
     |> Enum.map(fn({command, description}) -> IO.puts("  #{command} - #{description}") end)
+    IO.puts "Type help <command> to find out more about a specific command"
   end
 
 end
