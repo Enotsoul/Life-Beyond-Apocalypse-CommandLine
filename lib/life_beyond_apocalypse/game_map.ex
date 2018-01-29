@@ -22,7 +22,7 @@ defmodule GameMap do
     where_to = move_to(location,user)
     case verify_bounds(where_to,generate_map()) do
       {:ok, msg, {x,y}} ->
-        IO.puts IO.ANSI.format([:green, msg]) 
+        IO.puts IO.ANSI.format([:green, msg])
         User.set_struct(%User{ user | x: x, y: y})
         {:error, msg} ->
           IO.puts IO.ANSI.red  <> msg <> IO.ANSI.reset
@@ -34,8 +34,7 @@ defmodule GameMap do
       defp move_to("north", user),  do: {user.x, user.y - 1 }
       defp move_to("south", user),  do:       {user.x,user.y + 1}
       #In case we get an invalid location, we just sit put
-    #  defp  move_to(_where_to, user), do:    {user.x,user.y}
-
+      defp  move_to(_where_to, user), do:    {user.x,user.y}
 
       defp verify_bounds({x,y}, %{x: max_x, y: max_y}) when x>=1  and y>=1 and max_x>= x and max_y>=y  do
         {:ok, "You moved to #{x},#{y}", {x,y}}

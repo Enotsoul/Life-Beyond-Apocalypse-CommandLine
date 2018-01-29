@@ -20,6 +20,10 @@ defmodule LifeBeyondApocalypse.CLI do
     "help" => "?<topic>? - Shows help screen and help topics about various commands",
     "move" => "<location> - Moves to location. Valid options are: (w)est, (e)ast, (s)outh, (n)orth ",
     "map" => "Shows the map with your current location colored in",
+    "search" => "Shows the map with your current location colored in",
+    "inventory" => "Shows all the items in your inventory",
+    "use" => "<item> - Uses the item from your inventory.",
+    "drop" => "<item> - Drops a certain item from your inventory",
   }
   #  print_help_message()
   #{}"You should authenticate before doing anything else.	Available commands:
@@ -64,6 +68,65 @@ defmodule LifeBeyondApocalypse.CLI do
     GameMap.show_map()
       read_command()
   end
+
+  defp execute_command(["search"]) do
+    case GameItems.search() do
+      {:ok, _item, msg} -> IO.puts IO.ANSI.format([:green, msg])
+      {:false, msg} -> IO.puts IO.ANSI.format([:red, msg])
+    end
+    read_command()
+  end
+
+  defp execute_command(["inventory"]) do
+    {:ok, items} = GameItems.inventory()
+    IO.puts "Inventory consists of #{length items} items:"
+      for {item,nr} <- Enum.with_index(items)  do
+        IO.puts "(#{nr}) #{item.name} +#{item[:value]} #{item.type |>  Atom.to_string |> String.upcase }"
+      end
+      IO.puts "Commands to be used with items: use, info, drop"
+    read_command()
+  end
+
+  @doc """
+  Handles the commandline drop function of an item based on the partial name or inventory location
+  """
+  defp execute_command(["drop" | item_name]) do
+      item_name = List.to_string item_name
+      integer = Integer.parse(item_name)
+      if(integer == :error, do: name_or_number = item_name, else: name_or_number = integer)
+      case GameItems.find_item(name_or_number) do
+        {:found, item } ->
+          response = IO.ANSI.format([:italic,  "Are you sure you want to drop ",
+           :green, item.name, " ?", :magenta, " [Y]es/[N]o"]) |> read_text
+          if String.match?(response,~r/y(es)|true|ok/iu) do
+              GameItems.drop_item(item)
+              IO.ANSI.format([:green, "You have dropped #{item.name} from your inventory"])
+          else
+            IO.puts "You have decided NOT to drop the item."
+          end
+        {:notfound, msg} -> IO.puts IO.ANSI.format [:red,msg]
+      end
+      read_command()
+  end
+
+
+  defp execute_command(["use" | item_name]) do
+      item_name = List.to_string item_name
+      integer = Integer.parse(item_name)
+      if(integer == :error, do: name_or_number = item_name, else: name_or_number = integer)
+      case GameItems.find_item(name_or_number) do
+        {:found, item } ->
+            case GameItems.use_item(item) do
+              {:ok, msg} ->   IO.ANSI.format([:green, msg]) |> IO.puts
+              {:error, msg} ->   IO.ANSI.format([:red, msg]) |> IO.puts
+            end
+
+        {:notfound, msg} -> IO.puts IO.ANSI.format [:red,msg]
+      end
+      read_command()
+  end
+
+
 
 
   defp execute_command(_unknown) do

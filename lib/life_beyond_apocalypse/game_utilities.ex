@@ -9,4 +9,8 @@ defmodule GameUtilities do
           List.replace_at(Enum.at(arr, x), y, value)
           )
         end
+
+        def rand(min,max) do
+           :rand.uniform() * (max - min) + min;
+        end
 end

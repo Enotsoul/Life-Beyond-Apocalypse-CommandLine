@@ -1,19 +1,20 @@
 defmodule User do
-  defstruct name: "", health: 30, energy: 100, x: 5, y: 5, items: %{}, coins: 0, map_id: 1
+  defstruct name: "", health: 50, max_health: 50, energy: 100, max_energy: 100,
+      x: 5, y: 5, items: [], coins: 0, map_id: 1, experience: 0
 
 #Server API
   def new(user) do
-    user = receive do
+   receive do
       {:get, key, pid} ->
         send pid, {:value, Map.get(user,key)}
-        user
       {:get_struct,pid} ->
         send pid, {:user, user}
-        user
       {:set,key,value} ->
-       Map.put(user,key,value)
-       user
-      {:set_struct, struct} -> struct
+       user = Map.put(user,key,value)
+      {:set_struct, struct} -> user = struct
+      {:incr,key,incr} -> user =  Map.update(user,key,incr, &(incr+&1))
+      {:append,key,item} ->  user = Map.update(user, key, [item], &(&1 ++ [item]))
+
     end
     new(user)
   end
@@ -46,6 +47,18 @@ defmodule User do
 
   def set_struct(user) do
     send(:user_pid, {:set_struct, user})
+  end
+
+  def incr(key,incr) do
+    send(:user_pid, {:incr, key, incr})
+  end
+
+  def append(key,item) do
+    send(:user_pid, {:append, key, item})
+  end
+
+  def verify_maximum(key,incr) do
+       send(:user_pid, {:verify_maximum, key, incr})
   end
 
 end
