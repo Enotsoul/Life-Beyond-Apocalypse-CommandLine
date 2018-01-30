@@ -33,17 +33,20 @@ defmodule GameItems do
     search_item(GameUtilities.rand(1,10))
   end
 
-  defp search_item(chance) when chance > 5 do
+  def search_item(chance) when chance > 5 do
     item = Enum.random(@items)
     User.set(:items, User.get(:items) ++ [ item])
     User.set(:experience,User.get(:experience) - 1)
     {:ok, item ,"You've found a(n) #{item.name}! +1 XP, -1 energy"}
   end
 
-  defp search_item(_) do
+  def search_item(_) do
     {:false, "You've failed to find a usefull item. -1 energy"}
   end
 
+  def items() do
+    @items
+  end
   def inventory() do
     {:ok, User.get(:items)}
   end
@@ -67,7 +70,21 @@ defmodule GameItems do
       {:ok, item}
     end
 
+    @doc  """
+      Use a specific item
 
+    ## Examples
+    iex> User.start("Lord Praslea")
+    iex> User.set_struct(%User{energy: 30, health: 25})
+    iex> GameItems.use_item(  %{name: "Energizer",  type: :energy, value: 10,  price: 10 })
+    iex> User.get(:energy)
+    39
+    iex> GameItems.use_item( %{name: "Pain Killers", type: :health, value: 5, price: 5 })
+    iex> User.get(:health)
+    30
+    iex> GameItems.use_item( %{ type: :something_that_cannot_be_used })
+    {:error, "This item cannot be used at the moment"}
+    """
     def use_item(item) do
       use_item(item.type, item)
     end

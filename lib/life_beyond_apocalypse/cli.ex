@@ -35,7 +35,7 @@ defmodule LifeBeyondApocalypse.CLI do
     name =  read_text("What is your name dear adventurer?")
     IO.puts "Welcome to LifeBeyondApocalypse #{name}!"
     User.start(name)
-    read_command("To get started type in a command, or help")
+    read_command(IO.ANSI.format([:italic,"To find out more about a topic type", :magenta, " help <topic>"]))
   end
 
   defp read_text(text) do
@@ -101,6 +101,7 @@ defmodule LifeBeyondApocalypse.CLI do
           if String.match?(response,~r/y(es)|true|ok/iu) do
               GameItems.drop_item(item)
               IO.ANSI.format([:green, "You have dropped #{item.name} from your inventory"])
+              |> IO.puts
           else
             IO.puts "You have decided NOT to drop the item."
           end
