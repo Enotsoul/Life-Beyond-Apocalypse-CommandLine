@@ -27,10 +27,19 @@ defmodule GameItems do
   	%{name: "Mobile Phone" , type: :electronic, requires: "Battery", price: 50 },
 ]
 
+  @item_limit 30
 
   def search() do
-    User.set(:energy,User.get(:energy) - 1)
-    search_item(GameUtilities.rand(1,10))
+    if  length(User.get(:items)) < @item_limit do
+      {reason, energy_msg}  = User.use_energy(1)
+      if reason != :not_enough_energy do
+         search_item(GameUtilities.rand(1,10))
+       else
+         {:error, energy_msg}
+      end
+    else
+      {:error, "Before you start searching again, be sure you drop something since you're already carrying too many things (30 items limit)"}
+    end
   end
 
   def search_item(chance) when chance > 5 do
@@ -41,7 +50,7 @@ defmodule GameItems do
   end
 
   def search_item(_) do
-    {:false, "You've failed to find a usefull item. -1 energy"}
+    {:error, "You've failed to find a usefull item. -1 energy"}
   end
 
   def items() do
@@ -95,9 +104,14 @@ defmodule GameItems do
 
       {atom, value} = cap_at_maximum(Map.get(user,maximum), Map.get(user,item_type), item.value)
       if atom in [:maximum,:ok] do
-        User.set(item_type,value)
-        User.incr(:energy, -1)
-        drop_item(item)
+
+        {reason, energy_msg}  = User.use_energy(1)
+        if reason != :not_enough_energy do
+            User.set(item_type,value)
+            drop_item(item)
+         else
+           {:error, energy_msg}
+        end
       end
       {:ok, use_item_maximum_text(atom)
          |> EEx.eval_string([item: item, user: user, maximum: maximum])}

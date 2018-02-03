@@ -122,4 +122,24 @@ test "Drop an item, accept it being dropped" do
   )
 end
 
+test "user stats command" do
+  name = "Andrei"
+  commands = "#{name}\n
+   search \n search  \n search \n
+  move west
+  move south
+    stats
+   quit\n"
+  assert(
+  String.match?(capture_io(commands,
+  fn ->
+    #Fixing a bug..
+    User.destroy()
+    LifeBeyondApocalypse.CLI.main("")
+  end
+  ),
+  ~r/\[Stats\]:/iu)
+  )
+end
+
 end

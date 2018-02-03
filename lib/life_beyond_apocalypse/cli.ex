@@ -18,12 +18,13 @@ defmodule LifeBeyondApocalypse.CLI do
   @commands %{
     "quit" => "Quits the game",
     "help" => "?<topic>? - Shows help screen and help topics about various commands",
-    "move" => "<location> - Moves to location. Valid options are: (w)est, (e)ast, (s)outh, (n)orth ",
+    "move" => "<location> - Moves to location. Valid options are: (w)est, (e)ast, (s)outh, (n)orth, (nw)north-west, (ne)north-east, (sw)south-west, (se)south-east ",
     "map" => "Shows the map with your current location colored in",
     "search" => "Shows the map with your current location colored in",
     "inventory" => "Shows all the items in your inventory",
     "use" => "<item> - Uses the item from your inventory.",
     "drop" => "<item> - Drops a certain item from your inventory",
+    "stats" => "Displays information about your stats",
   }
   #  print_help_message()
   #{}"You should authenticate before doing anything else.	Available commands:
@@ -64,15 +65,30 @@ defmodule LifeBeyondApocalypse.CLI do
     read_command()
   end
 
+  defp execute_command([movement_location]) when
+  movement_location in ~w/n nw ne s sw se e w 1 2 3 4 5 6 7 8 9
+  north south west east north-west north-east  south-west south-east / do
+    if(is_integer(movement_location), do: Integer.to_string, else: movement_location)
+    |>   GameMap.movement_location
+    |>  GameMap.move
+    read_command()
+  end
+
+
   defp execute_command(["map"]) do
     GameMap.show_map()
+      read_command()
+  end
+
+  defp execute_command(["stats"]) do
+      User.user_stats() |> IO.write
       read_command()
   end
 
   defp execute_command(["search"]) do
     case GameItems.search() do
       {:ok, _item, msg} -> IO.puts IO.ANSI.format([:green, msg])
-      {:false, msg} -> IO.puts IO.ANSI.format([:red, msg])
+      {:error, msg} -> IO.puts IO.ANSI.format([:red, msg])
     end
     read_command()
   end
