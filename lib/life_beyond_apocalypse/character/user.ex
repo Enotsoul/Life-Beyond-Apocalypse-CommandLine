@@ -161,36 +161,39 @@ defmodule User do
     ## Examples
     iex> User.start("Lord Praslea")
     iex> User.set(%{energy: 5, max_energy: 10})
-    iex> User.use_energy(1)
+    iex> User.verify_energy(1)
     {:ok, nil}
-    iex> User.use_energy(3)
+    iex> User.use_energy(1)
+    iex> User.verify_energy(3)
     {:rest,
     "You are getting low on energy. You should find a safehouse to rest. 1 energy left."}
     iex> User.use_energy(3)
+    iex> User.verify_energy(3)
     {:not_enough_energy, "You don't have enough energy to perform this action."}
 
-
+    TODO change functions with new stats..:)
   """
-  def use_energy(decrease_energy) do
+  def verify_energy(decrease_energy) do
       user = User.get_struct()
-     {reason, msg} =  has_enough_energy(user, decrease_energy)
-     if reason in [:ok, :rest] do
-       User.incr(:energy, -decrease_energy)
-     end
-     {reason, msg}
+      has_enough_energy(user, decrease_energy)
   end
+
+  def use_energy(energy) do
+      User.incr(:energy, -energy)
+  end
+
 
   def has_enough_energy(%User{energy: energy, max_energy: max_energy}, decrease) when
     (energy - decrease) <=  (max_energy*0.25) and (energy - decrease) > 0  do
       msg = "You are getting low on energy. You should find a safehouse to rest. \
 #{energy - decrease} energy left."
       IO.ANSI.format([:yellow, msg]) |> IO.puts
-    {:rest, msg }
+    {:ok, msg }
   end
 
   def has_enough_energy(%User{energy: energy}, decrease) when
     (energy - decrease) <= 0  do
-    {:not_enough_energy, "You don't have enough energy to perform this action." }
+    {:error, "You don't have enough energy to perform this action." }
   end
 
     def has_enough_energy(%User{energy: energy}, decrease) when
