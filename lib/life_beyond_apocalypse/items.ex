@@ -31,9 +31,10 @@ defmodule GameItems do
 
   def search() do
     if  length(User.get(:items)) < @item_limit do
-      {reason, energy_msg}  = User.use_energy(1)
-      if reason != :not_enough_energy do
+      {reason, energy_msg}  = User.verify_energy(1)
+      if reason == :not_enough_energy do
          search_item(GameUtilities.rand(1,10))
+          User.use_energy(1)
        else
          {:error, energy_msg}
       end
@@ -95,7 +96,13 @@ defmodule GameItems do
     {:error, "This item cannot be used at the moment"}
     """
     def use_item(item) do
+      use_item_energy(User.verify_energy(1), item)
+    end
+    def use_item_energy({:ok, _} ,item) do
       use_item(item.type, item)
+    end
+    def use_item_energy({:error, energy_msg} , _item) do
+        {:error, energy_msg}
     end
 
     def use_item(item_type, item) when item_type in [:energy,:health] do
@@ -104,14 +111,9 @@ defmodule GameItems do
 
       {atom, value} = cap_at_maximum(Map.get(user,maximum), Map.get(user,item_type), item.value)
       if atom in [:maximum,:ok] do
-
-        {reason, energy_msg}  = User.use_energy(1)
-        if reason != :not_enough_energy do
-            User.set(item_type,value)
-            drop_item(item)
-         else
-           {:error, energy_msg}
-        end
+          User.use_energy(1)
+          User.set(item_type,value)
+          drop_item(item)
       end
       {:ok, use_item_maximum_text(atom)
          |> EEx.eval_string([item: item, user: user, maximum: maximum])}

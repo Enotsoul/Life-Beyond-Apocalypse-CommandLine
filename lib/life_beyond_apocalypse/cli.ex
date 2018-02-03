@@ -34,8 +34,14 @@ defmodule LifeBeyondApocalypse.CLI do
   def main(_args) do
     IO.puts(@tag)
     name =  read_text("What is your name dear adventurer?")
-    IO.puts "Welcome to LifeBeyondApocalypse #{name}!"
+
     User.start(name)
+    IO.puts "Generating starting map..."
+    GameMap.start_map()
+    %{max_x: max_x, max_y: max_y  } = GameMap.get_map()
+    User.set(%{x: GameUtilities.rand(1, max_x) , y: GameUtilities.rand(1,max_y) })
+    
+    IO.puts "Welcome to LifeBeyondApocalypse #{name}!"
     read_command(IO.ANSI.format([:italic,"To find out more about a topic type", :magenta, " help <topic>"]))
   end
 
