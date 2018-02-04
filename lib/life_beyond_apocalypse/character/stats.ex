@@ -100,8 +100,6 @@ Hidden stats
   # Fatigue
   Default value: 0 | Min value: -- | Max value: 1000
 
-
-
 Fatigue > 191 	Tired - Warned every 50 turns
 Fatigue > 383 	Dead tired -> stat penalties "disease"
 Fatigue > 575 	Exhausted -> Microsleep, no fatigue help, dangerous
@@ -109,8 +107,36 @@ Fatigue > 800   1 in 10 chance to fall in sleep instantly, fatigue reduced by 10
 Fatigue 1000 >  You fall asleep instantly and sleep for a while
 
 
-Sleeping $
-Consuming stimulants
+# Energy (needs to be figured out)
+Energy 1000 - 1500 => Extra Fresh
+Energy 700 - 1000 => Good condition
+Energy 500 - 700  - Tired - Warned every 50 turns/actions
+Energy 350 - 500  Dead tired -> stat penalties
+Energy 100 - 350 	Exhausted -> Microsleep, no fatigue/energy given,
+  dangerous if you're doing various activities like fighting..
+  Microsleep means you go out and for 1 minute you won't do anything
+Energy 0 - 100   1 in 10 chance to fall in sleep instantly.
+  => 5 minutes of waiting is necessary, fatigue is reduced and energy increased by 10
+  => This means you can fall asleep
+Energy 0 - You fall asleep instantly. 30 minutes you won't be able to do anything.
+
+
+# Sleeping $
+## High energy sleep
+High energy sleep gives you energy at a rate of +50 energy per hour
+You need to be in a safe environment for this to work.
+You also need to feel warm and not be disturbed by anything.
+
+## Low energy sleep
+When you are offline you go into a low energy sleep.
+Any sleep that is not safe, warm and that could "make you happy" is a low energy sleep.
+Meaning you get 10 energy per hour. 240 energy per day
+You will therefore need 4 days of offline gaming to be full again
+So it's best to sleep while "in the game" while safe.
+
+
+For the offline game..
+Consuming stimulants increases energy
 
 
     # Moves / Actions / Speed / Energy

@@ -1874,6 +1874,7 @@
   },{
     "type" : "item_group",
     "id" : "mischw",
+    "name" : "Misc"
     "items":[
       ["jumper_cable", 4],
       ["2x4", 60],
