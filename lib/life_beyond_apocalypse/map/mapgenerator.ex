@@ -52,7 +52,7 @@ defmodule MapGenerator do
       max_x: size_x,   max_y: size_y,
       map: generate_empty_map(size_x,size_y),
     }
-    {center_x, center_y} = {round(size_x/2), round(size_y/2)}
+    #{center_x, center_y} = {round(size_x/2), round(size_y/2)}
 
     map =  generate_roads_linear(map, {rand(3, 6), rand(3, 8), 1})
       |> draw_correct_road(1,1)
@@ -388,6 +388,10 @@ defmodule MapGenerator do
       {new_x, new_y}
     end
 
+    def road_list() do
+       Map.values(@road) ++ ["H", "road"]
+    end
+
 
     #################################################
     # Building generation and drawing functions
@@ -402,7 +406,7 @@ defmodule MapGenerator do
     def place_building_next_to_road(%{max_x: max_x, max_y: max_y} = map, x,y, count \\ 1)
         when x <= max_x and y <= max_y and count < 20000 do
           {new_x,new_y} = calc_x_y(x,y,max_x,max_y)
-          road_list = Map.values(@road) ++ ["H", "road"]
+          road_list = road_list()
           if  get(map.map, y- 1, x- 1) == "#" do
           existing_roads =  Enum.reduce(["n","e","w","s"],[], fn (direction, acc) ->
               {local_x, local_y} = direction   |>  GameMap.movement_location()
@@ -479,43 +483,8 @@ Iterates over shops,parks houses and creates the correct calculation based on th
           totalweight #{total_weight} total calculated buildings = #{total_buildings}"
     end
 
-    def draw_tinymap(tile) when tile in ~w/V > < ^/ do
-      json = File.read!("data/json/mapgen/house/house04.json")
-      [house] = Poison.decode!(json)
-      get_in(house, ["object","rows"])
-      # |> Enum.map(fn (x) -> x<> "\n" end) |> IO.puts
-      #  |> Enum.map(fn (x) -> List.insert_at(x,-1,"\n") end)
-    end
-    #   MapGenerator.draw_tinymap("V")  |> Enum.map(fn (x) -> x<> "\n" end) |> IO.puts
-#
-
-    @doc  """
-    Rotate a tinymap by 90 degrees starting from the topleft corner  counterclockwise clockwise
-NOTE: this ONLY works when MxN are the same size
-But since tinymaps are 24x24 it should work
-NOTE certain things like - and | need to be intechanged when rotating
-
-    ## Examples
-    iex>    tinymap = ~w/  ABCDE    FGHIJ    KLMNO    PQRTS    UVWXY    /
-    iex> MapGenerator.rotate_tinymap(tinymap,3,true)
-    [["E", "J", "O", "S", "Y"], ["D", "I", "N", "T", "X"],
-    ["C", "H", "M", "R", "W"], ["B", "G", "L", "Q", "V"],
-    ["A", "F", "K", "P", "U"]]
 
 
-    """
-    def rotate_tinymap(tinymap, rotation, split \\ false) when rotation <= 4 and rotation > 0 do
-      if split do
-          tinymap = Enum.map(tinymap, fn (x) -> String.split(x,"", trim: true ) end)
-      end
-      #THe important piece of art!
-      tinymap =  tinymap |> Enum.reverse |> List.zip |> Enum.map(&Tuple.to_list/1)
-      rotate_tinymap(tinymap, rotation-1, false)
-    end
-
-    def rotate_tinymap(tinymap, _rotation, _split) do
-      tinymap
-    end
 
 
 end

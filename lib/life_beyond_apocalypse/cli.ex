@@ -40,7 +40,7 @@ defmodule LifeBeyondApocalypse.CLI do
     GameMap.start_map()
     %{max_x: max_x, max_y: max_y  } = GameMap.get_map()
     User.set(%{x: GameUtilities.rand(1, max_x) , y: GameUtilities.rand(1,max_y) })
-    
+
     IO.puts "Welcome to LifeBeyondApocalypse #{name}!"
     read_command(IO.ANSI.format([:italic,"To find out more about a topic type", :magenta, " help <topic>"]))
   end
@@ -85,6 +85,12 @@ defmodule LifeBeyondApocalypse.CLI do
     GameMap.show_map()
       read_command()
   end
+
+  defp execute_command([command]) when command in ~w/examine info look/ do
+    Tinymap.examine_local_tinymap()
+    read_command()
+  end
+
 
   defp execute_command(["stats"]) do
       User.user_stats() |> IO.write
