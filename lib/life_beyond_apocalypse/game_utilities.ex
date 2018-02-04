@@ -83,25 +83,7 @@ defmodule GameUtilities do
       IO.ANSI.format([color, progress_bar(min, max, "#", length)])
     end
 
-@doc  """
-  Goes over all the files in the json folder and transforms each one
-  into elixir data structures (lists, keys,maps)
-  Then saves the output to files in the data_folder.
-
-  TODO file which stores a sha1 hash of all JSON files
-  if something has changed, go over the changed files
-  reloading the data 
-"""
-def convert_all_json_to_elixir_data(json_folder, data_folder) do
-  #{:ok, pid} =  File.open("data/game/regional_map_settings.map",[:write, :utf8])
-  #File.write!("data/game/regional_map_settings.map",inspect(city_data, pretty: true))
-  #File.write!("data/game/regional_map_settings.term",:erlang.term_to_binary(city_data))
 end
-
-end
-
-
-
 
 defmodule FileExt do
   @doc  """

@@ -22,6 +22,11 @@ defmodule DataStorage do
         {:set_struct, structure} -> data_structure  = structure
         {:incr,key,incr} -> data_structure =  Map.update(data_structure,key,incr, &(incr+&1))
         {:append,key,item} ->  data_structure = Map.update(data_structure, key, [item], &(&1 ++ [item]))
+        {:add, keys, value} ->
+            data_structure = put_in(data_structure,keys,value)
+        {:exists, key , pid} ->
+            send pid, {:exists, Map.has_key?(data_structure,key)}
+
       end
       new(data_structure)
     end
@@ -96,6 +101,25 @@ defmodule DataStorage do
     def append(process, key,item) do
       send(process, {:append, key, item})
     end
+
+    @doc  """
+      Updates nested maps
+    """
+    def add(process, keys, item) do
+      send(process, {:add, keys, item})
+    end
+
+    @doc  """
+      Verify if key exists
+    """
+    def exists(process, key) do
+      send(process, {:exists, key, self()})
+      receive do
+        {:exists, value} -> value
+        5000 -> {:error, "Did not respond on time"}
+      end
+    end
+
 
 
 end
