@@ -126,9 +126,9 @@ Aliases: info, look",
   defp execute_command(["inventory"]) do
     {:ok, items} = GameItems.inventory()
     IO.puts "Inventory consists of #{length items} items:"
-      for {{id, name},nr} <- Enum.with_index(items)  do
+      for {{id, name, count},nr} <- Enum.with_index(items)  do
       #  IO.puts "(#{nr}) #{item.name} +#{item[:value]} #{item.type |>  Atom.to_string |> String.upcase }"
-        IO.puts  "(#{nr}) #{name}"
+        IO.puts  "(#{nr}) #{name} (#{count})"
       end
       IO.puts "Commands to be used with items: use, info, drop"
     read_command()
@@ -191,7 +191,9 @@ Aliases: info, look",
     if String.length(input_command) >=2 do
       good_command = Enum.find(@command_list, fn (command) ->
         #  Logger.debug  "Unknown.. trying #{input_command} match with #{command} ?"
-         String.match?(command,~r/#{input_command}/iu)
+        #Regexp are not so safe with unknown input:)
+      #   String.match?(command,~r/#{input_command}/iu)
+         command =~ input_command
        end)
        if !is_nil(good_command) do
          execute_command([good_command | args ])

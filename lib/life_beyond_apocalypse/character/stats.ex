@@ -13,10 +13,11 @@ defmodule Stats do
 
 
 @doc  """
-base hp50 +4*5=70
-Each point increases your HP by 3. +5
+base hp 50 +4*5=70 ~> 30+4*5 => 50
+Each point increases your HP by +5
 Each point increases your Carry Weight by 9lbs. (4kg)
 Every 2 points increase your Melee Damage by 1.
+thus melee damage = Integer.floor_div(strength,2)
 
 Strength also makes you more resistant to many diseases and poisons,
 and makes actions which require brute force
@@ -75,8 +76,10 @@ Hidden stats
   Every 5 minutes (50 turns) increase by 1 point
   Or every 1 Action. This means that with every action all hidden stats increase by 1.
   They are updated every 10 actions.
-  NOTE. these values are for 5 minutes (50 "actions/turns") We will try to implement them for
+  NOTE. these values are for 5 minutes (50 "actions/turns") DEFAULT We will try to implement them for
   1 action or for 5 actions..
+  Best for 10 actions ? Anyway the numbers have to be recalculated
+  1200/(24*60/5)
 
   Hunger < 0 Full
   Hunger > 40 Hungry

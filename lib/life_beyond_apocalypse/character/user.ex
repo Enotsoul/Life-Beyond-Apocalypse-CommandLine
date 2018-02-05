@@ -1,7 +1,8 @@
 defmodule User do
-  defstruct name: "", health: 50, max_health: 50, energy: 100, max_energy: 100,
+  defstruct name: "", health: 50, max_health: 50, energy: 1000, max_energy: 1000,
       x: 5, y: 5, items: [], coins: 0, map_id: 1, experience: 0,
-      attack: 3, defense: 3,      hunger: 0, thirst: 0, fatigue: 0,
+      attack: 3, defense: 3,  fatigue: 0,
+       thirst: 0, max_thirst: 1200,   hunger: 0, max_hunger: 6000,
       strength: 4, dexterity: 4, intelligence: 4, perception: 4,
       max_carry_weight: 1300 + 1600,
       focus: 100, actions: 0, morale: 100
@@ -199,6 +200,8 @@ defmodule User do
     def has_enough_energy(%User{energy: energy}, decrease) when
       (energy - decrease) > 0,  do:       {:ok, nil}
 
+
+#TODO hunger status, fatigue status, thirst status
   def user_stats() do
 user = User.get_struct()
 """

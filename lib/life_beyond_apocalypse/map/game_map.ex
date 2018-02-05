@@ -156,7 +156,7 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
       def show_map() do
         %User{x: x, y: y} = User.get_struct()
         map = get_map()
-        text = IO.ANSI.format_fragment([:bright, :green, get(map.map, y - 1, x - 1), :reset, :white])
+        text = IO.ANSI.format_fragment([:green_background, :light_yellow, get(map.map, y - 1, x - 1), :reset, :white])
         IO.write  IO.ANSI.format([:white, set(map.map,  y - 1,x - 1, text  )])
       end
 

@@ -1,4 +1,5 @@
 defmodule GameItems do
+  import GameUtilities, only: [rand: 2]
   @item_limit 30
 
   def search([point_of_interest | _y_location])  do
@@ -19,7 +20,9 @@ defmodule GameItems do
       item =  tinymap["object"]["place_loot"]
         |> Enum.find(fn (loot_object) ->
             if !is_nil(loot_object["group"]) do
-              String.match?(loot_object["group"],~r/#{point_of_interest}/iu)
+              String.downcase(loot_object["group"]) =~ point_of_interest
+              #Regexp is unsafe with user provided data..
+              #String.match?(loot_object["group"],~r/#{point_of_interest}/iu)
             end
         end)
         if item != nil do
@@ -77,6 +80,7 @@ defmodule GameItems do
     #  Logger.debug "Items #{inspect items}"
       item = Enum.random(items)
       #TODO chance
+      {count_min, charges_min} = {nil,nil}
 
     #TODO a case implementation would work best
     #Since some item groups have other groups.......(INCEPTION!)
@@ -88,12 +92,20 @@ defmodule GameItems do
         #rand(chages-min,charges-max) rand(count-min, count-max)
         #And other possibilities
         %{"item" => item_id, "prob" => chance } = item
+        {charges_min, charges_max}  = {item["charges-min"] , item["charges-max"]}
+        {count_min, count_max} = {item["count-min"], item["count-max"]}
 
+      end
+    #  Logger.debug "item #{item_id} chance #{chance}"
+      cond do
+        !is_nil(count_min) -> count = rand(count_min,count_max)
+        !is_nil(charges_min) -> count = rand(charges_min,charges_max)
+        true -> count =1
       end
       if GameUtilities.rand(1,100) >= (100 - chance) do
       #  TODO count
         name = GameDatabase.get_name(item_id)
-        item_for_inventory = {item_id,name}
+        item_for_inventory = {item_id, name, count}
         User.set(:items, User.get(:items) ++ [item_for_inventory])
         User.incr(:experience,1)
         ##{IO.ANSI.format([:bright,loot_object["group"]])
@@ -124,9 +136,10 @@ defmodule GameItems do
   #Search based on name
   def find_item(item_name) when is_binary(item_name) do
     item = Enum.find(User.get(:items),
-      fn ({id, name}) ->
+      fn ({id, name, count}) ->
         #GameDatabase.get_name(&1)
-          String.match?(name,~r/#{item_name}/iu)
+      #    String.match?(name,~r/#{item_name}/iu)
+        String.downcase(name) =~ item_name
       end)
     if item == nil do
         {:notfound, ~s/You don't seem to have a(n) "#{item_name}" in your inventory/ }
@@ -215,7 +228,7 @@ defmodule GameItems do
     def examine_item(item_name_list) do
       item_name = item_name_list |> Enum.join(" ")
       case GameItems.find_item(item_name) do
-        {:found, {item_id, item_name} } ->
+        {:found, {item_id, item_name, _count} } ->
             item_info = GameDatabase.get_item_info(item_id)
             IO.puts "You are examining #{item_name}:"
             examine_item_type(item_info)
@@ -236,10 +249,13 @@ defmodule GameItems do
       Material(s): #{Enum.join(item_info["material"],", ")}
       Weight: #{weight}  Volume: #{volume}  Warmth: #{warmth}
       """
+      |> IO.puts
 
     end
 
     #TODO all other types including GUN
+
+    #TODO type COMESTIBLE (food, water, etc..)
 
     #When all else fails..
     def examine_item_type(item_info) do
