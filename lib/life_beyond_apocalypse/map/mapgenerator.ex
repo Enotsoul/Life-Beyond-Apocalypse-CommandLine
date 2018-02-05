@@ -34,7 +34,7 @@ defmodule MapGenerator do
 #    map = generate_rectangle_roads(map,{10 , 10},{1,1} )
     map =  generate_roads_linear(map, {rand(3, 6), rand(3, 8), 1})
       |> draw_correct_road(1,1)
-      |> place_building_next_to_road(1,1)
+    #  |> place_building_next_to_road(1,1,building)
     else
 
       {map, current_road} = generate_random_starting_road(map,   {center_x, center_y})
@@ -46,19 +46,30 @@ defmodule MapGenerator do
   #  calculate_buildings_for_city(map)
   end
 
+  @doc  """
+    Generates a new map with random building types and
+    random tinymaps for each map tile.
+
+  """
   def generate_new_map(name,size_x \\ 50, size_y \\ 30) do
       map = %{
         name: name,
       max_x: size_x,   max_y: size_y,
       map: generate_empty_map(size_x,size_y),
+      mapdrawing: [],
+      tinymaps: %{},
     }
     #{center_x, center_y} = {round(size_x/2), round(size_y/2)}
 
     map =  generate_roads_linear(map, {rand(3, 6), rand(3, 8), 1})
+    map =  Map.put(map,:mapdrawing,map.map)
+    buildings_list = generate_building_tiles_for_city(map)
+    map = place_building_next_to_road(map,1,1,buildings_list)
       |> draw_correct_road(1,1)
-      |> place_building_next_to_road(1,1)
+  #    |> place_building_next_to_road(1,1)
 
-      Map.put(map, :map, Enum.map(Map.get(map,:map),fn (x) -> List.insert_at(x,-1,"\n") end))
+    #The newline is important for the drawing of the map when rendering it to the user
+      Map.put(map, :mapdrawing, Enum.map(Map.get(map,:mapdrawing),fn (x) -> List.insert_at(x,-1,"\n") end))
   #  map.map |> Enum.map(fn (x) -> List.insert_at(x,-1,"\n") end) |> IO.puts
   end
 
@@ -201,20 +212,21 @@ defmodule MapGenerator do
     end
 
   def draw_between_points(map,{x1,y1},{x2,y2}) do
+    road =  "road" #"H"
      {x,y} = {abs(x1 - x2),abs(y1-y2)}
      {min_x, min_y} = {min(x1, x2),min(y1,y2)}
      #x = horizontal
      if x != 0 do
        map =   Enum.reduce(x1..x2, map,
         fn (next_x,map) ->
-            Map.put(map,:map,set(map.map,min_y + y - 1, next_x - 1 , "H" ))
+            Map.put(map,:map,set(map.map,min_y + y - 1, next_x - 1 , road ))
         end)
      end
      #y = vertical
      if y != 0 do
        map = Enum.reduce(y1..y2, map,
         fn (next_y,map) ->
-            Map.put(map,:map,set(map.map,next_y - 1, min_x + x - 1 , "H" ))
+            Map.put(map,:map,set(map.map,next_y - 1, min_x + x - 1 , road ))
         end)
      end
      map
@@ -249,6 +261,12 @@ defmodule MapGenerator do
       _ -> "O"
     end
   end
+
+  def is_house_symbol(symbol)  when symbol in ~w/V > < ^/ do
+      true
+  end
+  def is_house_symbol(_symbol) , do: false
+
   # Implement a function that starts from the centre going outwards..
 
 
@@ -342,7 +360,7 @@ defmodule MapGenerator do
 """
     def draw_correct_road(%{max_x: max_x, max_y: max_y} = map, x,y, count \\ 1)
       when x <= max_x and y <= max_y and count < 20000 do
-        {new_x,new_y} = calc_x_y(x,y,max_x,max_y)
+        {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
 
         road_list = Map.values(@road) ++ ["H", "road"]
 
@@ -361,7 +379,7 @@ defmodule MapGenerator do
             direction = existing_roads |> Enum.sort() |> List.to_string
           #  IO.puts "existing_roads #{inspect existing_roads} direction #{direction}"
             if(String.length(direction) == 1, do: direction = get_road_for_direction(direction))
-            map = Map.put(map,:map,set(map.map,y - 1, x - 1 , Map.get(@road,direction,"Z")))
+            map = Map.put(map,:mapdrawing,set(map.mapdrawing,y - 1, x - 1 , Map.get(@road,direction,"Z")))
 
           end
             count = count+1
@@ -399,13 +417,16 @@ defmodule MapGenerator do
 
 
     @doc  """
-      Places buildings V,>,<,^ next to roads so that they face the road.
+      Places buildings from the building_list V,>,<,^ next to roads so that they face the road.
       IN case of a building facing multiple roads a random position will be taken.
 
+      The following line is meant to avoid infinite loops:)
+            {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
     """
-    def place_building_next_to_road(%{max_x: max_x, max_y: max_y} = map, x,y, count \\ 1)
-        when x <= max_x and y <= max_y and count < 20000 do
-          {new_x,new_y} = calc_x_y(x,y,max_x,max_y)
+    def place_building_next_to_road(%{max_x: max_x, max_y: max_y} = map,
+      x,y,  buildings_list)
+        when x <= max_x and y <= max_y and length(buildings_list) >= 1  do
+          {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
           road_list = road_list()
           if  get(map.map, y- 1, x- 1) == "#" do
           existing_roads =  Enum.reduce(["n","e","w","s"],[], fn (direction, acc) ->
@@ -415,75 +436,114 @@ defmodule MapGenerator do
                 if(char in road_list, do:  acc ++ [direction], else: acc)
             end)
             if existing_roads  != [] do
+
               direction = existing_roads |> Enum.sort() |> Enum.random() #|>  List.to_string
+              [current_building | buildings_list] = buildings_list
 
             #  if(String.length(direction) > 1, do: direction = direction )
             #  IO.puts "#{x},#{y} - House next to road in #{inspect direction}"
-              map = Map.put(map,:map,set(map.map,y - 1, x - 1 , get_house_direction(direction)))
+            #IDEA have 2 maps, one with the name of each tile, another with the final drawing
+              map = Map.put(map,:map,set(map.map,y - 1, x - 1 , current_building ))
+              #TODO color hack
+              {symbol, color} = get_building_overmap_symbol(current_building)
+              color = return_color(color)
+              if is_house_symbol(symbol) do
+                symbol = get_house_direction(direction)
+              end
+              map = Map.put(map,:mapdrawing,set(map.mapdrawing,y - 1, x - 1 ,
+                IO.ANSI.format([[color], symbol])  ))
+                Logger.debug "Great, placed building #{current_building} #{symbol} #{inspect color} "
             end
-              count = count+1
           end
-
-            place_building_next_to_road(map, new_x, new_y, count)
+        place_building_next_to_road(map, new_x, new_y, buildings_list)
     end
-    def place_building_next_to_road(map, _x,_y, _count) do
+    def place_building_next_to_road(map, _x,_y, []) do
         map
     end
 
+    def get_building_overmap_symbol(building_name, color \\ nil) do
+      overmap_terrain =   DataStorage.get_nested(GameDatabase.get_database,
+      ["overmap_terrain",building_name])
+      {sym,copy_from,tile_color} = {overmap_terrain["sym"],overmap_terrain["copy-from"],
+      overmap_terrain["color"]}
+    #  Logger.debug "#{sym} - #{copy_from} - #{id} - #{abstract}"
+      passed_color = if(is_nil(color), do: tile_color, else: color)
+      if is_nil(sym) do
+        #  key = if(!is_nil(id), do: id, else: abstract)
+        if !is_nil(copy_from) do
+          get_building_overmap_symbol(copy_from,passed_color)
+        end
+      else
+        {<<sym>>, passed_color}
+      end
+    end
+
+  
 @doc  """
 Calculates total building occurence for the building types in a map.
 Total possible buildings = mapsize - roads
 Since houses would be the most we try to  tweak it increasing the shops likelyhood
 
-Loads regional settings and converts them to map.
 Iterates over shops,parks houses and creates the correct calculation based on the weight.
+
+Regional_map_settings is full of wonderful ideas.. to implement in the future
 """
+  def generate_building_tiles_for_city(map) do
+    total_buildings_list = calculate_buildings_for_city(map)
+    #Building our big list
+    total_buildings_list = total_buildings_list |> List.flatten
+    full_buildings_list = Enum.map(total_buildings_list, fn ({name, building_count}) ->
+      List.duplicate(name,building_count)
+    end)
+    |> List.flatten |> Enum.shuffle()
+
+    full_buildings_list
+  end
+
     def calculate_buildings_for_city(map) do
-      regional_map_settings_json = File.read!("data/json/regional_map_settings.json")
-      data_list = Poison.decode!(regional_map_settings_json)
-      [city_data] = data_list
-
-
+     city_data =  DataStorage.get_nested(GameDatabase.get_database,["region_settings","default"])
+    #  Logger.debug "Citydata #{inspect city_data}"
       types = ["shops","parks","houses"]
-      total_weight = Enum.reduce(types,0, fn (type, calc) ->
-          total = get_in(city_data,["city",type])
-        |> Enum.reduce(0,fn ({_name, count},acc) ->
-          if(is_integer(count), do: acc+count, else: acc)
-        end)
-        total + calc
-      end)
-       mapsize = map.max_y*map.max_x
+      total_weight = calculate_building_weights(types, city_data)
 
       remaining_available_tiles = Enum.count(List.flatten(map.map), fn (x) ->
         if(x == "#", do: true, else: false)
       end)
-      #First time i've used 2 for's in Elixir probably should split this up
-      #in subfunctions or multiple enum reduces like above with total_weight
-      priority = %{"houses" => 0.5 , "shops" => 2, "parks" => 1 }
-      total_buildings =   for type <- types do
+      #First time i've used 2 for's in Elixir. Enum functions are better
+      # probably should split this up in subfunctions or multiple enum reduces like above with total_weight
+      priority = %{"houses" => 0.5 , "shops" => 2, "parks" => 1.5 }
+      total_buildings_list =   for type <- types do
           multiply = Map.get(priority,type)
          for {name, individual_weight} <- get_in(city_data,["city",type]) do
-           buildings = 0
+           building_count = 0
            if name != "//" do
-
-            buildings = round(remaining_available_tiles*(individual_weight*multiply/total_weight))
-            IO.puts "#{name} has #{buildings} buildings"
-
+            building_count = round(remaining_available_tiles*(individual_weight*multiply/total_weight))
+            IO.puts "#{name} has #{building_count} buildings"
           end
-          buildings
+          {name, building_count}
          end
       end
-    total_buildings =  List.flatten(total_buildings) |> Enum.reduce(0,fn (x,acc) -> x + acc end)
-       #individual weight of each city building
-       individual_weight = 4
-       #We have 3 categories for which we need to do everything
-       # houses  , parks  , shops
-      how_many_for_building = round(mapsize*(individual_weight/total_weight))
-          IO.puts "mapsize #{mapsize} non road tiles: #{remaining_available_tiles}
-          totalweight #{total_weight} total calculated buildings = #{total_buildings}"
+      total_buildings_list
     end
 
+    def calculate_building_weights(types, city_data)  do
+       Enum.reduce(types,0, fn (type, calc) ->
+          total = get_in(city_data,["city",type])
+          |> Enum.reduce(0,fn ({_name, count},acc) ->
+            if(is_integer(count), do: acc+count, else: acc)
+        end)
+        total + calc
+      end)
+    end
 
+    def debug_calculation(_) do
+      ~S"""
+      mapsize = map.max_y*map.max_x
+         total_buildings =  List.flatten(total_buildings_list) |> Enum.reduce(0,fn ({name, count},acc) -> count + acc end)
+          IO.puts "mapsize #{mapsize} non road tiles: #{remaining_available_tiles}
+        totalweight #{total_weight} total calculated buildings = #{total_buildings}"
+"""
+    end
 
 
 

@@ -44,7 +44,6 @@ defmodule Tinymap do
 
 
 
-
   def get_tinymap_tile(tile) when tile in ~w/V > < ^/ do
     json = File.read!("data/json/mapgen/house/house04.json")
     [house] = Poison.decode!(json)

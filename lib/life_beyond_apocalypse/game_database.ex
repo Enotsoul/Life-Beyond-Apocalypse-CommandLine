@@ -12,6 +12,9 @@ defmodule GameDatabase do
 
   @database :game_database
 
+  def get_database() do
+    @database
+  end
   @doc  """
   Adds the data to the appropiate  object
   based on the type it adds the id

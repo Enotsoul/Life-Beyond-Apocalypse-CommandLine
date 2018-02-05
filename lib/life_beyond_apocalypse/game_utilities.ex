@@ -1,5 +1,5 @@
 defmodule GameUtilities do
-
+  require Logger
   def get(arr, x, y) do
     arr |> Enum.at(x) |> Enum.at(y)
   end
@@ -82,6 +82,74 @@ defmodule GameUtilities do
       end
       IO.ANSI.format([color, progress_bar(min, max, "#", length)])
     end
+
+
+######################################################
+# Generate coloring to Elixir ansi coloring names..
+######################################################
+    @doc  """
+    Color replacement
+    c = custom color
+    i = inverse / reverse
+    h = highlight (underline)
+    freaky stuff happening
+    brown -> yellow
+    yellow -> light_yellow
+  """
+    def return_color(color) when color != nil do
+     toreturn =   case String.split(color,"_") do
+         [what | the_rest] when what in ~w/i h c/ ->
+           [custom_color_data(what)] ++ return_color(Enum.join(the_rest,"_"))
+         [foreground] ->
+           [pick_color_to_atom(foreground)]
+
+         [intensity, "gray"] when intensity in ~w/light dark/  ->
+           [pick_color_to_atom("#{intensity} gray" )]
+         [intensity, foreground] when intensity in ~w/light/ ->
+           Logger.debug "what's happening here with #{intensity} and #{foreground}"
+              [pick_color_to_atom(intensity <> "_" <> foreground)]
+         [foreground, background] ->
+            [pick_color_to_atom(foreground),
+              get_background_color(background)]
+         [intensity, foreground, background] ->
+            [pick_color_to_atom(intensity <> "_" <> foreground),
+              get_background_color(background)]
+        _ -> :white
+       end
+       Logger.debug "Incoming color #{color} outgoing #{inspect toreturn}"
+       toreturn
+    end
+    def return_color(_color) do
+      :font_2
+    end
+
+    def custom_color_data(what) do
+      case what do
+        "i" -> :inverse
+        "h" -> :underline
+        _ -> :font_1
+      end
+    end
+
+    def get_background_color(color) do
+        pick_color(color) <> "_background"   |>  String.to_atom
+    end
+
+    def pick_color( color) do
+      case color do
+        "brown" -> "yellow"
+        "yellow" -> "light_yellow"
+        "light gray" -> "white"
+        "dark gray" -> "light_black"
+        "pink" -> "magenta"
+        _ -> color
+      end
+    end
+    def pick_color_to_atom(color) do
+      pick_color(color) |> String.to_atom
+    end
+
+
 
 end
 
