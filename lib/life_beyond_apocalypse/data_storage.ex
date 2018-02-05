@@ -13,6 +13,9 @@ defmodule DataStorage do
             return_data = Map.get(data_structure,key)
           end
           send pid, {:value, return_data}
+        {:get_nested, keys, pid} ->
+          return_data = get_in(data_structure,keys)
+          send pid, {:get_nested, return_data}
         {:get_struct,pid} ->
           send pid, {:data_structure, data_structure}
         {:set, key, value} ->
@@ -20,7 +23,7 @@ defmodule DataStorage do
          {:set, mapped_values} ->
             data_structure = Map.merge(data_structure, mapped_values)
         {:set_struct, structure} -> data_structure  = structure
-        {:incr,key,incr} -> data_structure =  Map.update(data_structure,key,incr, &(incr+&1))
+        {:incr, key, incr} -> data_structure =  Map.update(data_structure,key,incr, &(incr+&1))
         {:append,key,item} ->  data_structure = Map.update(data_structure, key, [item], &(&1 ++ [item]))
         {:add, keys, value} ->
             data_structure = put_in(data_structure,keys,value)
@@ -46,11 +49,23 @@ defmodule DataStorage do
 
     @doc  """
       Gets a key from the process
+      Either a simple key, a list of keys  using the Take
       """
     def get(process, key) do
       send(process, {:get, key, self()})
       receive do
         {:value, value} -> value
+        5000 -> {:error, "Did not respond on time"}
+      end
+    end
+
+    @doc  """
+      Gets the keys using get_in
+      """
+    def get_nested(process, keys) do
+      send(process, {:get_nested, keys, self()})
+      receive do
+        {:get_nested, value} -> value
         5000 -> {:error, "Did not respond on time"}
       end
     end

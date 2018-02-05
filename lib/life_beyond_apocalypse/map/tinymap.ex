@@ -10,27 +10,38 @@ defmodule Tinymap do
   """
   def examine_local_tinymap() do
     #TODO verify energy.. decrease eenrgy
+    {reason, tinymap_tile} =  return_tile_info_for_user()
+    if :ok == reason do
+      examination_report(tinymap_tile)
+    else
+      IO.puts tinymap_tile
+    end
+  end
+
+  def examination_report(tinymap_tile) do
+    drawing = get_in(tinymap_tile, ["object","rows"])
+    |> draw_tile()
+
+    describe(tinymap_tile) |> IO.puts
+    IO.write drawing
+    #TODO draw the "set" points
+    #TODO place loot..
+    #Todo search loot:)
+    show_loot(tinymap_tile) |> IO.write
+  end
+
+  def return_tile_info_for_user() do
+    #TODO verify energy.. decrease eenrgy
     %{x: x, y: y} = User.get(~w/x y/a)
     map = GameMap.get_map()
     tile = get(map.map,y-1,x-1)
     if tile in MapGenerator.road_list() do
       tile = "road"
     end
-    {reason, tinymap_tile} =  get_tinymap_tile(tile)
-    if :ok == reason do
-      drawing = get_in(tinymap_tile, ["object","rows"])
-      |> draw_tile()
+     get_tinymap_tile(tile)
 
-      describe(tinymap_tile) |> IO.puts
-      IO.write drawing
-      #TODO draw the "set" points
-      #TODO place loot..
-      #Todo search loot:)
-      show_loot(tinymap_tile) |> IO.write
-    else
-      IO.puts tinymap_tile
-    end
   end
+
 
 
 
@@ -79,8 +90,12 @@ defmodule Tinymap do
     if !is_nil(loot) do
     {map, _acc} =  Enum.map_reduce(loot, 0, fn (object,acc) ->
         group_or_item = if(object["group"] != nil, do:  object["group"], else: object["item"])
+        name = GameDatabase.get_name(group_or_item)
+        if(is_nil(name), do:
+        name = String.replace(group_or_item,"_", " ") |> String.capitalize,
+      else: name = name |> String.capitalize)
         [x, _] =  object["x"];  [y, _] =  object["y"]
-        {~s/(#{IO.ANSI.format([:magenta, Integer.to_string(acc)])}). #{IO.ANSI.format([:green, group_or_item])} at (#{x},#{y}), /, acc+1}
+        {~s/(#{IO.ANSI.format([:magenta, Integer.to_string(acc)])}). #{IO.ANSI.format([:green, name])} at (#{x},#{y}), /, acc+1}
       end)
       Enum.into(map,["You can search the following points of interest: \n"])
     end
@@ -95,13 +110,15 @@ defmodule Tinymap do
     if tile_terrain != "house"  do
       tile_terrain = "road"
     end
-    terrain_info = get_in(tile,["object","terrain"])
-    furniture_info = get_in(tile,["object","furniture"])
-    description = Map.merge(terrain_info,furniture_info)
+    description = Map.merge(get_in(tile,["object","terrain"]), get_in(tile,["object","furniture"]))
+    tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
+      name = GameDatabase.get_name(id) |> String.capitalize
+        acc <> "#{IO.ANSI.format([:blue, tile])} <= " <> name <> ", "
+    end)
     """
       You are currently outside in front of a #{IO.ANSI.format([:magenta, tile_terrain])}.
       Each tinymap tile means the following:
-      #{inspect description}
+      #{tile_description}
     """
   end
 

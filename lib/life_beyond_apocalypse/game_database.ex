@@ -62,11 +62,30 @@ defmodule GameDatabase do
       printable_limit: :infinity, limit: :infinity))
   end
 
-  #Pattern matching fails if id, or abstract don't exist..
-  #so we need to manually get the data
-  #Map.Take is not what we're searching for either..
+  @doc  """
+    Loading the database file into our dedicated process in memory.
+  """
+  def load_database(db_file \\ "data/game/life_beyond_apocalypse.db") do
+      database_from_file = File.read!(db_file) |> :erlang.binary_to_term
+      DataStorage.start(@database, DataStorage, :new, %{})
+      DataStorage.set_struct(@database,database_from_file)
+  end
+
+    @doc  """
+    #Pattern matching fails if id, or abstract don't exist..
+    #so we need to manually get the data
+    #Map.Take is not what we're searching for either..
+
+    The ID is usually either "id", "abstract" or "ident"
+    I haven't observed other ID's but if a json object doesn't have other info
+
+    TODO: type MONSTER_FACTION is again "special"
+    since it seems that the "name" works like an ID.. will modify it later
+    """
+
   def handle_object(object) do
-    {id, type, abstract} = { object["id"], object["type"], object["abstract"]}
+    {id, ident, type, abstract, name} = { object["id"], object["ident"],
+     object["type"],  object["abstract"], object["name"]}
 
     #IO.inspect object
     cond do
@@ -78,14 +97,21 @@ defmodule GameDatabase do
         DataStorage.add(@database,[type,abstract], object)
       type == "uncraft" ->
         DataStorage.add(@database,[type, object["result"]], object)
+      !is_nil(ident) ->
+        create_category_for_type(type, %{})
+        DataStorage.add(@database,[type,ident], object)
       true ->
         create_category_for_type(type, [])
         DataStorage.append(@database,type,object)
     end
 
-    if !is_nil(object["name"]) do
+    if !is_nil(name) and !(type in ~w/monstergroup/) do
         key = if(!is_nil(id), do: id, else: abstract)
-        DataStorage.add(@database,["names",key],object["name"])
+        key = if(is_nil(key), do: ident, else: key)
+        if is_nil(key) do
+          Logger.warn "OOPS.. nil key for  #{inspect key} name #{inspect name} type #{inspect type} "
+        end
+        DataStorage.add(@database,["names",key],%{"name" => name, "type" => type})
     end
   end
   #Used for reverse searching when the user types certain names
@@ -118,8 +144,19 @@ defmodule GameDatabase do
   Gets the name from the database for a certain key..
   """
   def get_name(key) do
-
+    DataStorage.get_nested(@database,["names", key,"name"])
   end
+
+  def get_type(key) do
+    DataStorage.get_nested(@database,["names", key,"type"])
+  end
+
+  def get_item_info(key) do
+    type = get_type(key)
+  #  Logger.debug "Get item info #{key} type #{type} "
+    DataStorage.get_nested(@database,[type, key])
+  end
+
   @doc  """
     Goes over all the files in the json folder and transforms each one
     into elixir data structures (lists, keys,maps)

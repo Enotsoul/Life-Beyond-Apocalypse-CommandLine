@@ -75,6 +75,8 @@ Hidden stats
   Every 5 minutes (50 turns) increase by 1 point
   Or every 1 Action. This means that with every action all hidden stats increase by 1.
   They are updated every 10 actions.
+  NOTE. these values are for 5 minutes (50 "actions/turns") We will try to implement them for
+  1 action or for 5 actions..
 
   Hunger < 0 Full
   Hunger > 40 Hungry
@@ -108,16 +110,13 @@ Fatigue 1000 >  You fall asleep instantly and sleep for a while
 
 
 # Energy (needs to be figured out)
-Energy 1000 - 1500 => Extra Fresh
+Energy 1000 - 1500  => Extra Fresh
 Energy 700 - 1000 => Good condition
 Energy 500 - 700  - Tired - Warned every 50 turns/actions
-Energy 350 - 500  Dead tired -> stat penalties
-Energy 100 - 350 	Exhausted -> Microsleep, no fatigue/energy given,
+Energy 250 - 500  Dead tired -> stat penalties
+Energy 1 - 250 	Exhausted -> Microsleep, no fatigue/energy given,
   dangerous if you're doing various activities like fighting..
   Microsleep means you go out and for 1 minute you won't do anything
-Energy 0 - 100   1 in 10 chance to fall in sleep instantly.
-  => 5 minutes of waiting is necessary, fatigue is reduced and energy increased by 10
-  => This means you can fall asleep
 Energy 0 - You fall asleep instantly. 30 minutes you won't be able to do anything.
 
 
