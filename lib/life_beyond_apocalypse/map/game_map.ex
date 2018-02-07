@@ -72,6 +72,11 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
       DataStorage.get_struct(:game_map)
   end
 
+  def get_tinymap_tile(x,y) do
+    DataStorage.get_struct(:game_map)
+  end
+
+
   @doc  """
     Moves the user to the chosen location.
     Can be north, south, west, east
@@ -155,18 +160,25 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
     def verify_bounds({:unknown}, _mapinfo), do: {:error, "That direction doesn't exist."}
 
       def verify_bounds({x,y}, %{max_x: max_x, max_y: max_y}) when x>=1  and y>=1 and max_x >= x and max_y >= y  do
-        {:ok, "You moved to #{x},#{y}", {x,y}}
+        id =  DataStorage.get(:game_map,:map)
+          |> get(x-1,y-1)
+          name = GameDatabase.get_name(id)
+        {:ok, "You moved to #{x},#{y}. You see a #{name} ", {x,y}}
       end
       def verify_bounds({_x,_y},_mapinfo) do
         {:error, "You are at the edge of the map and can't move further in this direction."}
       end
 
+
       def show_map() do
+        %{x: x, y: y} = User.get(~W/x y/a)
+        sign_location = IO.ANSI.format_fragment([:light_magenta_background,
+        :white,   :bright, :underline, "&",:reset, :white])
+        IO.puts "You're currently located at #{x},#{y} (#{sign_location}) "
         %User{x: x, y: y} = User.get_struct()
         map = get_map()
-        text = IO.ANSI.format_fragment([:green_background, :light_yellow, get(map.map, y - 1, x - 1), :reset, :white])
-        IO.write  IO.ANSI.format([:white, set(map.map,  y - 1,x - 1, text  )])
+              IO.write  IO.ANSI.format([:white, set(map.mapdrawing,  x - 1, y - 1, sign_location  )])
+    #    IO.write  set(map.mapdrawing,  x - 1, y - 1, text  )
       end
-
 
     end

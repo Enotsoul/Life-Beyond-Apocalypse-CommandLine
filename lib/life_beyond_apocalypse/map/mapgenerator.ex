@@ -22,28 +22,7 @@ defmodule MapGenerator do
 
 
   def main(size_x \\ 50, size_y \\ 30) do
-      map = %{
-      max_x: size_x,   max_y: size_y,
-      map: generate_empty_map(size_x,size_y),
-    }
-    {center_x, center_y} = {round(size_x/2), round(size_y/2)}
 
-    if true do
-      map = Map.put(map,:road_rectangles,%{})
-  #map =  generate_road_drunkard_walk(map, {center_x, center_y} )
-#    map = generate_rectangle_roads(map,{10 , 10},{1,1} )
-    map =  generate_roads_linear(map, {rand(3, 6), rand(3, 8), 1})
-      |> draw_correct_road(1,1)
-    #  |> place_building_next_to_road(1,1,building)
-    else
-
-      {map, current_road} = generate_random_starting_road(map,   {center_x, center_y})
-      map = generate_road(map, current_road,   {center_x, center_y})
-      map
-    end
-    map.map |> Enum.map(fn (x) -> List.insert_at(x,-1,"\n") end) |> IO.puts
-  # disabled for testing
-  #  calculate_buildings_for_city(map)
   end
 
   @doc  """
@@ -57,7 +36,6 @@ defmodule MapGenerator do
       max_x: size_x,   max_y: size_y,
       map: generate_empty_map(size_x,size_y),
       mapdrawing: [],
-      tinymaps: %{},
     }
     #{center_x, center_y} = {round(size_x/2), round(size_y/2)}
 
@@ -66,7 +44,8 @@ defmodule MapGenerator do
     buildings_list = generate_building_tiles_for_city(map)
     map = place_building_next_to_road(map,1,1,buildings_list)
       |> draw_correct_road(1,1)
-  #    |> place_building_next_to_road(1,1)
+    map =  Map.put(map,:tinymap,map.map)
+      |> generate_tinymaps(1,1)
 
     #The newline is important for the drawing of the map when rendering it to the user
       Map.put(map, :mapdrawing, Enum.map(Map.get(map,:mapdrawing),fn (x) -> List.insert_at(x,-1,"\n") end))
@@ -83,10 +62,10 @@ defmodule MapGenerator do
 
   def generate_road_drunkard_walk(map, {x, y}, count ) when count < 50 do
     {direction, {next_x, next_y}} = next_road_location(map,"news", {x, y})
-    if get(map.map,next_y - 1, next_x - 1) != "#" do
+    if get(map.map, next_x - 1,next_y - 1) != "#" do
       generate_road_drunkard_walk(map, {x, y}, count + 1 )
     else
-      map = Map.put(map,:map,set(map.map,next_y - 1, next_x - 1 , "H" )) # Map.get(@road,"ensw")))
+      map = Map.put(map,:map,set(map.map, next_x - 1 , next_y - 1, "H" )) # Map.get(@road,"ensw")))
       IO.puts "Generate road #{next_x},#{next_y}"
       generate_road_drunkard_walk(map, {next_x, next_y}, count + 2)
     end
@@ -125,9 +104,8 @@ defmodule MapGenerator do
      map = Enum.reduce([point1, point2, point3, point4], map,
       fn ({next_x, next_y},map) ->
       #     Logger.debug "Next values of point.. #{next_x},#{next_y} "
-          Map.put(map,:map,set(map.map,next_y - 1, next_x - 1 , "H" ))
+          Map.put(map,:map,set(map.map, next_x - 1 ,next_y - 1, "H" ))
       end)
-    # map = Map.put(map,:map,set(map.map,next_y - 1, next_x - 1 , "H" ))
      #4. draw roads between points
       # point1 -> point2
       #point1-> point3
@@ -219,14 +197,14 @@ defmodule MapGenerator do
      if x != 0 do
        map =   Enum.reduce(x1..x2, map,
         fn (next_x,map) ->
-            Map.put(map,:map,set(map.map,min_y + y - 1, next_x - 1 , road ))
+            Map.put(map,:map,set(map.map, next_x - 1 , min_y + y - 1, road ))
         end)
      end
      #y = vertical
      if y != 0 do
        map = Enum.reduce(y1..y2, map,
         fn (next_y,map) ->
-            Map.put(map,:map,set(map.map,next_y - 1, min_x + x - 1 , road ))
+            Map.put(map,:map,set(map.map, min_x + x - 1 , next_y - 1, road ))
         end)
      end
      map
@@ -277,7 +255,7 @@ defmodule MapGenerator do
     #################################################
   def generate_random_starting_road(map, {x, y}) do
     {road, map_char} = Enum.random(@road)
-      map = Map.put(map,:map,set(map.map,y - 1, x - 1, map_char))
+      map = Map.put(map,:map,set(map.map, x - 1, y - 1, map_char))
       {map, road}
   end
 
@@ -290,14 +268,13 @@ defmodule MapGenerator do
     |> GameMap.move_to(%User{x: x, y: y})
     {next_x,next_y} = location
     #IO.puts "#{ get(map.map,next_y - 1, next_x - 1)}  #{get(map.map,y - 1, x - 1)}"
-    if get(map.map,next_y - 1, next_x - 1) == "#" do
+    if get(map.map, next_x - 1, next_y - 1) == "#" do
       {direction, location}
     else
-    #  next_road_location(map,current_road, {x, y}, [opposite_of(direction)])
-      {direction, location}
+      next_road_location(map,current_road, {x, y}, [opposite_of(direction)])
+      #{direction, location}
     end
   end
-
 
 
 #NOTE: this may have an issue if the current road is a corner
@@ -338,7 +315,7 @@ defmodule MapGenerator do
     count = count + 1
     {direction, {next_x, next_y}} = next_road_location(map, current_road, {x, y})
     road =  next_road(direction)
-    map = Map.put(map,:map,set(map.map,next_y - 1, next_x - 1 , Map.get(@road,road)))
+    map = Map.put(map,:map,set(map.map, next_x - 1 , next_y - 1, Map.get(@road,road)))
 #IO.puts "Direction #{direction} Current Road #{current_road} #{x},#{y} next one #{road} #{next_x},#{next_y}"
       generate_road(map, road, {next_x,next_y}, count)
 
@@ -364,11 +341,11 @@ defmodule MapGenerator do
 
         road_list = Map.values(@road) ++ ["H", "road"]
 
-        if  get(map.map, y- 1, x- 1) in road_list do
+        if  get(map.map,  x- 1, y- 1) in road_list do
         existing_roads =  Enum.reduce(["n","e","w","s"],[], fn (direction, acc) ->
             {local_x, local_y} = direction   |>  GameMap.movement_location()
               |> GameMap.move_to(%User{x: x, y: y})
-              char = get(map.map, max(rem(local_y,max_y+1),1)-1, max(rem(local_x,max_x+1),1)-1)
+              char = get(map.map, max(rem(local_x,max_x+1),1)-1,  max(rem(local_y,max_y+1),1)-1)
               if char in road_list do
     #  IO.puts "char #{inspect char} acc #{inspect acc} direction #{inspect direction} #{x},#{y} "
                   acc = acc ++ [direction]
@@ -379,7 +356,7 @@ defmodule MapGenerator do
             direction = existing_roads |> Enum.sort() |> List.to_string
           #  IO.puts "existing_roads #{inspect existing_roads} direction #{direction}"
             if(String.length(direction) == 1, do: direction = get_road_for_direction(direction))
-            map = Map.put(map,:mapdrawing,set(map.mapdrawing,y - 1, x - 1 , Map.get(@road,direction,"Z")))
+            map = Map.put(map,:mapdrawing,set(map.mapdrawing, x - 1 , y - 1, Map.get(@road,direction,"Z")))
 
           end
             count = count+1
@@ -410,6 +387,22 @@ defmodule MapGenerator do
        Map.values(@road) ++ ["H", "road"]
     end
 
+    def get_building_overmap_symbol(building_name, color \\ nil) do
+      overmap_terrain =   DataStorage.get_nested(GameDatabase.get_database,
+      ["overmap_terrain",building_name])
+      {sym,copy_from,tile_color} = {overmap_terrain["sym"],overmap_terrain["copy-from"],
+      overmap_terrain["color"]}
+    #  Logger.debug "#{sym} - #{copy_from} - #{id} - #{abstract}"
+      passed_color = if(is_nil(color), do: tile_color, else: color)
+      if is_nil(sym) do
+        #  key = if(!is_nil(id), do: id, else: abstract)
+        if !is_nil(copy_from) do
+          get_building_overmap_symbol(copy_from,passed_color)
+        end
+      else
+        {<<sym>>, passed_color}
+      end
+    end
 
     #################################################
     # Building generation and drawing functions
@@ -428,11 +421,11 @@ defmodule MapGenerator do
         when x <= max_x and y <= max_y and length(buildings_list) >= 1  do
           {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
           road_list = road_list()
-          if  get(map.map, y- 1, x- 1) == "#" do
+          if  get(map.map, x-1, y-1) == "#" do
           existing_roads =  Enum.reduce(["n","e","w","s"],[], fn (direction, acc) ->
               {local_x, local_y} = direction   |>  GameMap.movement_location()
                 |> GameMap.move_to(%User{x: x, y: y})
-                char = get(map.map, max(rem(local_y,max_y+1),1)-1, max(rem(local_x,max_x+1),1)-1)
+                char = get(map.map,  max(rem(local_x,max_x+1),1)-1, max(rem(local_y,max_y+1),1)-1)
                 if(char in road_list, do:  acc ++ [direction], else: acc)
             end)
             if existing_roads  != [] do
@@ -443,16 +436,16 @@ defmodule MapGenerator do
             #  if(String.length(direction) > 1, do: direction = direction )
             #  IO.puts "#{x},#{y} - House next to road in #{inspect direction}"
             #IDEA have 2 maps, one with the name of each tile, another with the final drawing
-              map = Map.put(map,:map,set(map.map,y - 1, x - 1 , current_building ))
+              map = Map.put(map,:map,set(map.map, x - 1 , y - 1, current_building ))
               #TODO color hack
               {symbol, color} = get_building_overmap_symbol(current_building)
               color = return_color(color)
               if is_house_symbol(symbol) do
                 symbol = get_house_direction(direction)
               end
-              map = Map.put(map,:mapdrawing,set(map.mapdrawing,y - 1, x - 1 ,
+              map = Map.put(map,:mapdrawing,set(map.mapdrawing, x - 1 , y - 1,
                 IO.ANSI.format([[color], symbol])  ))
-                Logger.debug "Great, placed building #{current_building} #{symbol} #{inspect color} "
+            #    Logger.debug "Great, placed building #{current_building} #{symbol} #{inspect color} "
             end
           end
         place_building_next_to_road(map, new_x, new_y, buildings_list)
@@ -460,25 +453,13 @@ defmodule MapGenerator do
     def place_building_next_to_road(map, _x,_y, []) do
         map
     end
-
-    def get_building_overmap_symbol(building_name, color \\ nil) do
-      overmap_terrain =   DataStorage.get_nested(GameDatabase.get_database,
-      ["overmap_terrain",building_name])
-      {sym,copy_from,tile_color} = {overmap_terrain["sym"],overmap_terrain["copy-from"],
-      overmap_terrain["color"]}
-    #  Logger.debug "#{sym} - #{copy_from} - #{id} - #{abstract}"
-      passed_color = if(is_nil(color), do: tile_color, else: color)
-      if is_nil(sym) do
-        #  key = if(!is_nil(id), do: id, else: abstract)
-        if !is_nil(copy_from) do
-          get_building_overmap_symbol(copy_from,passed_color)
-        end
-      else
-        {<<sym>>, passed_color}
-      end
+    def place_building_next_to_road(%{max_y: max_y} = map, _x,y, buildings) when  max_y < y do
+      Logger.debug "Exceeding Y size of map, and still have unasigned buildings  #{length buildings} #{inspect buildings}"
+        map
     end
 
-  
+
+
 @doc  """
 Calculates total building occurence for the building types in a map.
 Total possible buildings = mapsize - roads
@@ -518,7 +499,7 @@ Regional_map_settings is full of wonderful ideas.. to implement in the future
            building_count = 0
            if name != "//" do
             building_count = round(remaining_available_tiles*(individual_weight*multiply/total_weight))
-            IO.puts "#{name} has #{building_count} buildings"
+          #  IO.puts "#{name} has #{building_count} buildings"
           end
           {name, building_count}
          end
@@ -545,6 +526,36 @@ Regional_map_settings is full of wonderful ideas.. to implement in the future
 """
     end
 
+    @doc  """
+      For each tile in the map we will generate a random tinymap
+      We will store these in map.tinymap as a structure map
+      %{type: "house", tinymap: "tinymap data" }
 
+      # For roads we'll do the infamous overmap terrain "mall_a_27"
+      Untill we refactor our database for the _overmap_terrain type
+    """
+    def generate_tinymaps(%{max_x: max_x, max_y: max_y} = map,  x,y)
+        when x <= max_x and y <= max_y   do
+      {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
+    #  road_list = road_list()
+      tile_name =  get(map.map, x-1, y-1)
+      tile_name = case tile_name  do
+        "road" -> "mall_a_27"
+        "#" -> Enum.random(~w/orchard forest/)
+        _  -> tile_name
+      end
+      Logger.debug "Tilename #{tile_name} at #{x},#{y}"
+      #TODO important to create another function which works with
+      # random_tinymap_from_tilename so it extracts only what's actually needed..
+      tinymap  = Tinymap.random_tinymap_from_tilename(tile_name)
+      tile_map  = %{ type: tile_name, tinymap: tinymap}
+
+      map = Map.put(map,:tinymap, set(map.tinymap, x - 1 , y - 1, tile_map))
+      generate_tinymaps(map, new_x, new_y)
+    end
+
+    def generate_tinymaps(map, _x,_y) do
+        map
+    end
 
 end

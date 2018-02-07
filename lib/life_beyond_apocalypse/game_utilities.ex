@@ -1,12 +1,12 @@
 defmodule GameUtilities do
   require Logger
   def get(arr, x, y) do
-    arr |> Enum.at(x) |> Enum.at(y)
+    arr |> Enum.at(y) |> Enum.at(x)
   end
 
   def set(arr, x, y, value) do
-    List.replace_at(arr, x,
-    List.replace_at(Enum.at(arr, x), y, value)
+    List.replace_at(arr, y,
+      List.replace_at(Enum.at(arr, y), x, value)
     )
   end
 
@@ -106,7 +106,6 @@ defmodule GameUtilities do
          [intensity, "gray"] when intensity in ~w/light dark/  ->
            [pick_color_to_atom("#{intensity} gray" )]
          [intensity, foreground] when intensity in ~w/light/ ->
-           Logger.debug "what's happening here with #{intensity} and #{foreground}"
               [pick_color_to_atom(intensity <> "_" <> foreground)]
          [foreground, background] ->
             [pick_color_to_atom(foreground),
@@ -116,7 +115,6 @@ defmodule GameUtilities do
               get_background_color(background)]
         _ -> :white
        end
-       Logger.debug "Incoming color #{color} outgoing #{inspect toreturn}"
        toreturn
     end
     def return_color(_color) do

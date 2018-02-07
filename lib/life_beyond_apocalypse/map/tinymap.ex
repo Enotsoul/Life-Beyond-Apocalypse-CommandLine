@@ -1,5 +1,6 @@
 defmodule Tinymap do
   import GameUtilities
+  require Logger
   #################################################
   # Tinymap
   #################################################
@@ -19,27 +20,26 @@ defmodule Tinymap do
   end
 
   def examination_report(tinymap_tile) do
+
     drawing = get_in(tinymap_tile, ["object","rows"])
     |> draw_tile()
+  #  IO.puts "Hey Dude! #{inspect tinymap_tile} \n\n #{drawing}"
 
     describe(tinymap_tile) |> IO.puts
     IO.write drawing
     #TODO draw the "set" points
     #TODO place loot..
     #Todo search loot:)
-    show_loot(tinymap_tile) |> IO.write
+    show_loot(tinymap_tile) |> List.to_string |> IO.write
   end
 
   def return_tile_info_for_user() do
     #TODO verify energy.. decrease eenrgy
     %{x: x, y: y} = User.get(~w/x y/a)
-    map = GameMap.get_map()
-    tile = get(map.map,y-1,x-1)
-    if tile in MapGenerator.road_list() do
-      tile = "road"
-    end
-     get_tinymap_tile(tile)
-
+    tinymap = DataStorage.get_nested(:game_map, [:tinymap])
+      |>   get(x-1,y-1) |> Map.get(:tinymap)
+      {:ok, tinymap}
+  #  get_tinymap_tile(tinymap)
   end
 
 
@@ -84,20 +84,35 @@ defmodule Tinymap do
 
   #Ignore the chance.. it's used for finding
   def show_loot(tile) do
-    loot = get_in(tile,["object","place_loot"])
+    loot_big = [get_in(tile,["object","place_loot"]), get_in(tile,["object","place_items"])]
+    Enum.map(loot_big, fn loot ->
     #TODO each of the object or group must have a beautiful name translation
     if !is_nil(loot) do
     {map, _acc} =  Enum.map_reduce(loot, 0, fn (object,acc) ->
         group_or_item = if(object["group"] != nil, do:  object["group"], else: object["item"])
         name = GameDatabase.get_name(group_or_item)
         if(is_nil(name), do:
-        name = String.replace(group_or_item,"_", " ") |> String.capitalize,
-      else: name = name |> String.capitalize)
-        [x, _] =  object["x"];  [y, _] =  object["y"]
-        {~s/(#{IO.ANSI.format([:magenta, Integer.to_string(acc)])}). #{IO.ANSI.format([:green, name])} at (#{x},#{y}), /, acc+1}
+          name = String.replace(group_or_item,"_", " ") |> String.capitalize,
+        else: name = name |> String.capitalize)
+
+        x = get_object_xy(object,"x")
+        y = get_object_xy(object,"y")
+          {~s/(#{IO.ANSI.format([:magenta, Integer.to_string(acc)])}). #{IO.ANSI.format([:green, name])} at (#{x},#{y}), /, acc+1}
       end)
       Enum.into(map,["You can search the following points of interest: \n"])
+    else
+          "Nothing interesting to search..."
     end
+    end)
+  end
+
+  def get_object_xy(object, loc) do
+    if is_list(object[loc]) do
+      [xy, _] =  object[loc]
+    else
+      xy = object[loc]
+    end
+    xy
   end
 
   @doc  """
@@ -106,16 +121,15 @@ defmodule Tinymap do
   def describe(tile) do
     #TODO The terrain name should be taken from overmap_terrain,json
     [tile_terrain] = get_in(tile,["om_terrain"])
-    if tile_terrain != "house"  do
-      tile_terrain = "road"
-    end
+
     description = Map.merge(get_in(tile,["object","terrain"]), get_in(tile,["object","furniture"]))
     tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
       name = GameDatabase.get_name(id) |> String.capitalize
         acc <> "#{IO.ANSI.format([:blue, tile])} <= " <> name <> ", "
     end)
+    tile_terrain_name = GameDatabase.get_name(tile_terrain) |> String.capitalize
     """
-      You are currently outside in front of a #{IO.ANSI.format([:magenta, tile_terrain])}.
+      You are currently outside in front of a #{IO.ANSI.format([:magenta, tile_terrain_name])}.
       Each tinymap tile means the following:
       #{tile_description}
     """
@@ -172,5 +186,57 @@ defmodule Tinymap do
         end
       end)
     end)
+  end
+
+  ######################################################
+  # Tinymap generation functions (MapGenerator)
+  ######################################################
+  #If they don't exist look for abstract
+  #THESE ARE PROBLEM FACTOS! we need to generate a random thing for most of these
+  # for example we can generate buildings and fill them with items randomly..
+  def random_tinymap_from_tilename(tile) when tile in
+    ~w/forest forest_thick station_radio house_base spider_pit s_lot s_sports police  mil_surplus pawn/ do
+    case tile do
+      "road" ->
+        #TODO not used yet
+        DataStorage.get_nested(:game_database,["overmap_terrain_list","road"])
+        "generate a  random road .."
+      "house_base" -> random_tinymap_from_tilename("house")
+      "pawn" ->
+        random = DataStorage.get_nested(:game_database,["overmap_terrain_list", "pawn shop"])
+        |> Enum.reject(fn (x) -> x == "pawn" end)
+        |> Enum.random
+        random_tinymap_from_tilename(random)
+      "police" ->
+          random = DataStorage.get_nested(:game_database,["overmap_terrain_list", "police station"])
+          |> Enum.reject(fn (x) -> x == "police" end)
+          |> Enum.random
+          random_tinymap_from_tilename(random)
+      _ ->
+        # ===== TODO=====
+        # TODO generate a forest automatically & in another clause..
+        # ===== TODO=====
+        # flags => ~w/TREE SHRUBS
+        random = DataStorage.get_nested(:game_database,["overmap_terrain_list",
+          "forest"])     -- ~w/forest forest_thick spider_pit/    |> Enum.random
+          Logger.debug "Tile #{tile}  not supported.. else putting forest probably .. #{random}"
+        random_tinymap_from_tilename(random)
+    end
+  end
+
+  #Probably doesn't exist.. so we need to get a different type of random
+  def random_tinymap_from_tilename(tile) do
+    random_mapgen_id = DataStorage.get_nested(GameDatabase.get_database,["mapgen_tiles",tile])
+      |> Enum.random
+    DataStorage.get_nested(GameDatabase.get_database,["mapgen",random_mapgen_id])
+  end
+
+
+  @doc  """
+    Get a terrain type by certain traits
+    Like flags
+  """
+  def get_terrain_by_flags() do
+
   end
 end

@@ -42,7 +42,9 @@ defmodule GameDatabase do
     output_file \\ "data/game/life_beyond_apocalypse.db") do
     json_files = FileExt.ls_r(json_folder)
     DataStorage.start(@database, DataStorage, :new, %{})
-    Enum.each(~w/uncraft names name_to_id/,  &create_category_for_type(&1, %{}))
+    DataStorage.set(@database, :unique_mapgen_id, 1 )
+    Enum.each(~w/uncraft names name_to_id mapgen mapgen_tiles overmap_terrain_list/,
+        &create_category_for_type(&1, %{}))
     Enum.each(json_files, fn (file) ->
         #Logger.debug "Parsing file #{file}"
         json = File.read!(file)
@@ -103,10 +105,15 @@ defmodule GameDatabase do
       !is_nil(ident) ->
         create_category_for_type(type, %{})
         DataStorage.add(@database,[type,ident], object)
+      type == "mapgen" ->
+          id = mapgen_building_tinymaps(object)
       true ->
         create_category_for_type(type, [])
         DataStorage.append(@database,type,object)
     end
+    #TODO IDEA type "overmap_terrain" contains id's but maybe it's a good idea to do
+    #something simiar for mapgen_building_tinymaps for the name & id:) in a list
+    overmap_terrain_tinymaps(object,type)
 
     if !is_nil(name) and !(type in ~w/monstergroup/) do
         key = if(!is_nil(id), do: id, else: abstract)
@@ -128,6 +135,85 @@ defmodule GameDatabase do
        DataStorage.set(@database, type, empty_struct_type )
     end
   end
+
+  @doc  """
+    objects with the mapgen type don't have an id.
+    When we generate a map we will need to group them by the "om_terrain"
+    key value type. Let's generate a unique id mapgen_1234355
+    We'll just use the GameDatabase with a key mapgen_unique_id which we will
+    increment for each mapgen. Each object will be added under the mapgen key
+    Afterwards we create another key mapgen_tiles which contains the "om_terrain"
+    subkey and reference to the object id's
+
+    This way we have a ordered way of handling map generation
+  """
+  def mapgen_building_tinymaps(object)  do
+    type = object["type"]
+    unique_mapgen_id = "mapgen_#{DataStorage.get(@database, :unique_mapgen_id)}"
+    DataStorage.add(@database,[type,unique_mapgen_id], object)
+
+    om_terrain = object["om_terrain"]
+    if is_nil(om_terrain) do
+      om_terrain = [object["nested_mapgen_id"]]
+    end
+  #  Logger.debug "What is om_terrain #{inspect om_terrain} for object:\n #{inspect object}"
+    Enum.each(om_terrain, fn (terrain) ->
+      existing_data =  DataStorage.get_nested(@database,["mapgen_tiles",terrain])
+      if !is_nil(existing_data) do
+        data = existing_data ++ [unique_mapgen_id]
+      else
+        data = [unique_mapgen_id]
+      end
+      DataStorage.add(@database,["mapgen_tiles",terrain], data)
+    end)
+    DataStorage.incr(@database, :unique_mapgen_id,1)
+  end
+
+
+  @doc  """
+    Groups overmap terrains based on name & id
+    Similair to mapgen_building_tinymaps
+  """
+  def overmap_terrain_tinymaps(object,type) when type == "overmap_terrain"  do
+    name = object["name"]
+    id = object["id"]
+
+  #  Logger.debug "Overmap Terrain #{name} with id #{id}"
+    if !is_nil(id) do
+      existing_data =  DataStorage.get_nested(@database,["overmap_terrain_list",name])
+      if !is_nil(existing_data) do
+        data = existing_data ++ [id]
+      else
+        data = [id]
+      end
+      DataStorage.add(@database,["overmap_terrain_list",name], data)
+    end
+    overmap_terrain_tinymaps_mapgen(object,object["mapgen"])
+  end
+
+  def overmap_terrain_tinymaps(_,_), do: false
+
+  @doc  """
+    Some JSON files can contain overmap_terrain that contain mapgen   data..
+    We need to build a new object and pass it to mapgen_building_tinymaps.
+    I've only counted 15 such mapgen buildings, however
+    the overmap_terrain.json file contains 31 mapgen for builtin generation .
+    mods could contain more
+  """
+  def overmap_terrain_tinymaps_mapgen(object,mapgen) when mapgen != nil do
+    Enum.each(mapgen, fn (single_mapgen) ->
+      if Map.get(single_mapgen,"method") == "json" do
+        newobject = single_mapgen
+        |>  Map.put("om_terrain", [object["id"]])
+        |> Map.put("type", "mapgen")
+        mapgen_building_tinymaps(newobject)
+
+      end
+    end)
+  end
+  def overmap_terrain_tinymaps_mapgen(_object,_mapgen), do: false
+
+
 
   def get_all_keys_count(database) do
     Map.keys(database) |> Enum.each(fn (x) ->
