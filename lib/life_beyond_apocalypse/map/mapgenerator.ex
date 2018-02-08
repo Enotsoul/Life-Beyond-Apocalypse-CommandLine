@@ -387,12 +387,20 @@ defmodule MapGenerator do
        Map.values(@road) ++ ["H", "road"]
     end
 
-    def get_building_overmap_symbol(building_name, color \\ nil) do
+    def get_building_overmap_symbol(building_name, color \\ nil)
+
+    #Some buildings have issues (really, like real people)
+    def get_building_overmap_symbol(building_name, _)
+    when building_name in ~w/house_two_story_basement/ do
+      {"F", "c_green"}
+    end
+  #  def get_building_overmap_symbol(building_name, color \\ nil) do
+    def get_building_overmap_symbol(building_name, color) do
       overmap_terrain =   DataStorage.get_nested(GameDatabase.get_database,
       ["overmap_terrain",building_name])
       {sym,copy_from,tile_color} = {overmap_terrain["sym"],overmap_terrain["copy-from"],
       overmap_terrain["color"]}
-    #  Logger.debug "#{sym} - #{copy_from} - #{id} - #{abstract}"
+    #  Logger.debug "Building_name #{building_name} - Sym #{sym} - copy_from #{copy_from} -      Overmap Terrain #{inspect overmap_terrain} "
       passed_color = if(is_nil(color), do: tile_color, else: color)
       if is_nil(sym) do
         #  key = if(!is_nil(id), do: id, else: abstract)
@@ -545,10 +553,9 @@ Regional_map_settings is full of wonderful ideas.. to implement in the future
         _  -> tile_name
       end
       Logger.debug "Tilename #{tile_name} at #{x},#{y}"
-      #TODO important to create another function which works with
-      # random_tinymap_from_tilename so it extracts only what's actually needed..
-      tinymap  = Tinymap.random_tinymap_from_tilename(tile_name)
-      tile_map  = %{ type: tile_name, tinymap: tinymap}
+
+      {mapgen_id, tinymap}  = Tinymap.create_random_tinymap(tile_name)
+      tile_map  = %{ type: tile_name, tinymap: tinymap, mapgen_id: mapgen_id}
 
       map = Map.put(map,:tinymap, set(map.tinymap, x - 1 , y - 1, tile_map))
       generate_tinymaps(map, new_x, new_y)

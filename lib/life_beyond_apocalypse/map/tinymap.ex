@@ -44,25 +44,6 @@ defmodule Tinymap do
 
 
 
-  def get_tinymap_tile(tile) when tile in ~w/V > < ^/ do
-    json = File.read!("data/json/mapgen/house/house04.json")
-    [house] = Poison.decode!(json)
-    {:ok, house}
-  end
-  #   MapGenerator.draw_tinymap("V")  |> Enum.map(fn (x) -> x<> "\n" end) |> IO.puts
-  #
-
-  def get_tinymap_tile("road")  do
-    # mall_a_27
-    json = File.read!("data/json/mapgen/mall.json")
-    mall = Poison.decode!(json)
-    {:ok, find_in_list(mall, "om_terrain","mall_a_27")}
-  end
-
-  def get_tinymap_tile(_) do
-      {:nothing, "You're in the middle of nowhere.. Nothing interesting to see"}
-  end
-
 
   def find_in_list(list, key, value) do
      Enum.find(list, fn (object) ->
@@ -122,7 +103,12 @@ defmodule Tinymap do
     #TODO The terrain name should be taken from overmap_terrain,json
     [tile_terrain] = get_in(tile,["om_terrain"])
 
-    description = Map.merge(get_in(tile,["object","terrain"]), get_in(tile,["object","furniture"]))
+    terrain = get_in(tile,["object","terrain"])
+    furniture =  get_in(tile,["object","furniture"])
+
+    description = if(!is_nil(furniture), do:
+     Map.merge(terrain,furniture )  , else: terrain )
+
     tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
       name = GameDatabase.get_name(id) |> String.capitalize
         acc <> "#{IO.ANSI.format([:blue, tile])} <= " <> name <> ", "
@@ -195,7 +181,8 @@ defmodule Tinymap do
   #THESE ARE PROBLEM FACTOS! we need to generate a random thing for most of these
   # for example we can generate buildings and fill them with items randomly..
   def random_tinymap_from_tilename(tile) when tile in
-    ~w/forest forest_thick station_radio house_base spider_pit s_lot s_sports police  mil_surplus pawn/ do
+    ~w/forest forest_thick station_radio house_base  house_two_story_basement
+    spider_pit s_lot s_sports police  mil_surplus pawn/ do
     case tile do
       "road" ->
         #TODO not used yet
@@ -219,7 +206,7 @@ defmodule Tinymap do
         # flags => ~w/TREE SHRUBS
         random = DataStorage.get_nested(:game_database,["overmap_terrain_list",
           "forest"])     -- ~w/forest forest_thick spider_pit/    |> Enum.random
-          Logger.debug "Tile #{tile}  not supported.. else putting forest probably .. #{random}"
+          Logger.warn "WARNING! Tile #{tile}  not supported.. YOU NEED TO IMPLEMENT IT SOMEDAY putting forest random item .. #{random}"
         random_tinymap_from_tilename(random)
     end
   end
@@ -228,9 +215,64 @@ defmodule Tinymap do
   def random_tinymap_from_tilename(tile) do
     random_mapgen_id = DataStorage.get_nested(GameDatabase.get_database,["mapgen_tiles",tile])
       |> Enum.random
-    DataStorage.get_nested(GameDatabase.get_database,["mapgen",random_mapgen_id])
+
+      {random_mapgen_id, DataStorage.get_nested(GameDatabase.get_database,["mapgen",random_mapgen_id])}
   end
 
+  @doc  """
+  THIS IS WORK IN PROGRESS
+  This function takes a random tinymap from the list
+  And randomizes it based on the data provided.
+  Stripping down it's size in the way since we already have all the data we need
+  stored for each tinymap location
+  Game of chance for everything based on the chance value of each object:
+
+    "terrain" and "furniture" need to be merged in 1 map => description
+    "fill_ter" => Fill up the empty spaces with this terrain
+    "set" -> sets certain tiles on the map example trees :)
+    "mapping" => Object with objects and lists of mapping of characters
+    to certain items again with chance (swamp_shack.json)
+    "place_loot" => list of items "group" (item_groups) or "item" (singular items) to loot
+    "place_items" -> Placing an item on the map itself
+        this could mean that the item is only placed once and not a "loot" option
+    place_monster => There's a monster from a certain group here
+    "place_vendingmachines" => Placing a vending machine (necropolis.json)
+        itemgroups/vending_machines.json
+    "place_vehicles" => Vehicles  placed at certain locations (cars) (necropolis.json)
+    "vehicles" -> probably simple items placed on 1 tile
+
+    We will only store  the rows since those can change form map to map depending on various activities
+    And a list of references to which items are to be searchable
+
+  """
+  def create_random_tinymap(tile_name) do
+     {mapgen_id, tinymap} = random_tinymap_from_tilename(tile_name)
+
+       rows = get_in(tinymap,["object","rows"])
+
+
+       place_items =   get_in(tinymap,["object","place_items"])
+        |> random_items_from_list()
+       place_loot = get_in(tinymap,["object","place_loot"])
+        |> random_items_from_list()
+       new_tinymap = %{ rows: rows, place_loot: place_loot, place_items: place_items }
+       {mapgen_id, new_tinymap}
+  end
+
+  def random_items_from_list(items_list) when items_list != nil do
+    {searchable_items, _}  =  Enum.reduce(items_list, {[],0}, fn (object,{map,acc}) ->
+        group_or_item = if(object["group"] != nil, do:  object["group"], else: object["item"])
+      #  name = GameDatabase.get_name(group_or_item)
+        if one_in(3) do
+          map =  map ++ [acc]
+        end
+        {map, acc+1}
+      end)
+      searchable_items
+  end
+  def random_items_from_list(list) do
+    nil
+  end
 
   @doc  """
     Get a terrain type by certain traits
@@ -240,3 +282,4 @@ defmodule Tinymap do
 
   end
 end
+#File.write!("game.map", inspect(map , pretty: true,  printable_limit: :infinity, limit: :infinity) )
