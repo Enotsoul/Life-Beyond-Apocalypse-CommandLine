@@ -151,7 +151,7 @@ defmodule GameItems do
   def search_item({chance, group_name})  do
     item_list =  DataStorage.get_nested(:game_database,["item_group", group_name])
     if item_list != nil do
-      item = item_list |> Map.get("items") |> Enum.random(item_list)
+      item = item_list |> Map.get("items") |> Enum.random()
       if GameUtilities.rand(1,100) >= (100 - chance) do
         search_item_final(item,group_name)
       else

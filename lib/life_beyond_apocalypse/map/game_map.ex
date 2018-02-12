@@ -64,9 +64,9 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
     %{map: map, x: x, y: y}
   end
 
-  def start_map(name \\ "Zombie City") do
+  def start_map(name \\ "Zombie City", x_size \\ 48, y_size \\24) do
     DataStorage.start(:game_map, DataStorage, :new,
-      MapGenerator.generate_new_map(name, 48,24))
+      MapGenerator.generate_new_map(name, x_size,y_size))
   end
   def get_map() do
       DataStorage.get_struct(:game_map)
@@ -77,29 +77,7 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
   end
 
 
-  @doc  """
-    Moves the user to the chosen location.
-    Can be north, south, west, east
 
-    ## Examples
-    iex> User.start("Lord Praslea")
-    iex> User.set(:x,5);  User.set(:y,5)
-    iex> GameMap.move("west")
-    {:ok, "You moved to 4,5"}
-    iex> GameMap.move("south")
-    iex> GameMap.move("east")
-    iex> GameMap.move("north")
-    {:ok, "You moved to 5,5"}
-    iex> GameMap.move("heaven")
-    {:error, "That direction doesn't exist."}
-    iex> GameMap.move("north")
-    iex> GameMap.move("north")
-    iex> GameMap.move("north")
-    iex> GameMap.move("north")
-    iex> GameMap.move("north")
-    iex> GameMap.move("north")
-    {:error, "You are at the edge of the map and can't move further in this direction."}
-  """
   def movement_location(location) do
     #  n nw ne s sw se e w north south west east north-west north-east
     #  south-west south-east 1 2 3 4 5 6 7 8 9
@@ -117,6 +95,16 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
     end
   end
 
+  @doc  """
+    Moves the user to the chosen location.
+    Verifies if the user is not out of bounds (margins ofmap)
+    and if he has enough energy.
+    Decreases the energy.
+    Can be any direction supported by movement_location
+
+    ## Examples
+
+  """
   def move(location) do
     #Logger.debug "Move to #{location}"
     user = User.get_struct()

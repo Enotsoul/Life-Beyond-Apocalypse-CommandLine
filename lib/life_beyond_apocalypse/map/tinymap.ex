@@ -122,11 +122,11 @@ defmodule Tinymap do
 
     description = if(!is_nil(furniture), do:
       Map.merge(terrain,furniture )  , else: terrain )
-      Logger.debug "Description #{inspect description}"
+    #  Logger.debug "Description #{inspect description}"
     tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
 
         name = GameDatabase.get_name(id)
-        Logger.debug "Ok #{name} and id #{id}"
+      #  Logger.debug "Ok #{name} and id #{id}"
         if(is_nil(name), do:
           name = String.replace(id,"_", " ") |> String.capitalize,
         else: name = name |> String.capitalize)
@@ -226,7 +226,7 @@ defmodule Tinymap do
         # flags => ~w/TREE SHRUBS
         random = DataStorage.get_nested(:game_database,["overmap_terrain_list",
           "forest"])     -- ~w/forest forest_thick spider_pit/    |> Enum.random
-          Logger.warn "WARNING! Tile #{tile}  not supported.. YOU NEED TO IMPLEMENT IT SOMEDAY putting forest random item .. #{random}"
+        #  Logger.warn "WARNING! Tile #{tile}  not supported.. YOU NEED TO IMPLEMENT IT SOMEDAY putting forest random item .. #{random}"
         random_tinymap_from_tilename(random)
     end
   end
