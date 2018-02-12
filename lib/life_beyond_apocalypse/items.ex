@@ -1,41 +1,113 @@
 defmodule GameItems do
+  require Logger
   import GameUtilities, only: [rand: 2]
   @item_limit 30
 
+
+
+  #################################################
+  # Search based on point of interest
+  #################################################
+  @doc """
+    search based on point of interests
+  """
   def search([point_of_interest | _y_location])  do
     verify_point_of_interest_before_searching(point_of_interest)
   end
 
   def verify_point_of_interest_before_searching(point_of_interest) do
-      {reason, tinymap} = Tinymap.return_tile_info_for_user()
-      if reason == :ok do
-        has_looting?(point_of_interest,tinymap)
-      else
-        {:error, tinymap}
-      end
+     local_tinymap = Tinymap.return_tile_info_for_user()
+      has_looting?(point_of_interest,local_tinymap)
+
   end
-  def has_looting?(point_of_interest, tinymap) do
-    object = tinymap["object"]
-    if Map.has_key?(object,"place_loot") do
-      item =  tinymap["object"]["place_loot"]
-        |> Enum.find(fn (loot_object) ->
-            if !is_nil(loot_object["group"]) do
-              String.downcase(loot_object["group"]) =~ point_of_interest
-              #Regexp is unsafe with user provided data..
-              #String.match?(loot_object["group"],~r/#{point_of_interest}/iu)
+  @doc  """
+    This function verifies if the current tinymap where the user is
+    located at has the looting conditions the user typed and if they
+    exist within the original mapgen.
+    TODO requires fixing
+  """
+  def has_looting?(point_of_interest, %{mapgen_id: mapgen_id} = local_tinymap) do
+    look_for_items_list = ~w/place_loot place_items/
+    mapgen_tinymap =  DataStorage.get_nested(GameDatabase.get_database,["mapgen",mapgen_id])
+    mapgen_object = mapgen_tinymap["object"]
+    found_looting = Enum.reduce(look_for_items_list, {false,false,false}, fn (look_for, acc) ->
+      {chance, item_name, id}  = has_looting_for(point_of_interest, mapgen_object, look_for)
+      allowed_searchable = local_tinymap[:tinymap][String.to_atom(look_for)]
+      if is_list(allowed_searchable) do
+      #  IO.puts "#{look_for} : #{ok} - #{allowed_searchable}"
+        if(id in   allowed_searchable, do: acc =   {chance, item_name, id})
+      end
+      acc
+    end)
+    {chance, item_name, _id} = found_looting
+    Logger.debug  "Found looting #{inspect found_looting} "
+    if chance != false do
+      #The chance for searching a point of interest is 85% of the total chance..
+      continue_searching({round(chance*0.85), item_name})
+    else
+      {:error, "No such point of interest or nothing to be searched here. Type examine to review your options."}
+    end
+    #      {:error, "No such point of interest, type examine to review your options and then search again."}
+    #      {:error, "Nothing interesting exists to be looted here. Try another map."}
+  end
+  @doc  """
+  We verify if the point of interest exists
+
+  """
+  def has_looting_for(point_of_interest, mapgen_object, look_for) do
+    if Map.has_key?(mapgen_object,look_for) do
+
+        {_acc, data} = Enum.reduce(  mapgen_object[look_for], {0, {nil,nil,nil}},
+        fn (loot_object, {acc, data}) ->
+         item_name =  cond do
+             !is_nil(loot_object["group"])  ->
+                loot_object["group"]
+             !is_nil(loot_object["item"])  ->
+                 loot_object["item"]
+              true ->  ""
             end
+            #TODO pass the chance?
+            Logger.debug "comparing #{item_name} to #{point_of_interest}"
+            if(String.replace(item_name,"_", " ") =~ point_of_interest,
+              do: data = {loot_object["chance"], item_name, acc})
+            {acc+1, data}
         end)
-        if item != nil do
-          continue_searching(item, tinymap)
-        else
-          {:error, "No such point of interest, type examine to review your options and then search again."}
-        end
+        data
       else
-        {:error, "Nothing interesting exists to be looted here. Try another map."}
+        {nil, nil,nil}
     end
   end
 
-  def continue_searching(loot_object, _tinymap) do
+
+
+    @doc  """
+      Search location  picking a random point of interest from the available
+      place_loot and place_items
+      Simple and clean method without the complications available with point of interests..
+
+    """
+    def search()  do
+      %{mapgen_id: mapgen_id}  = Tinymap.return_tile_info_for_user()
+      mapgen_tinymap =  DataStorage.get_nested(GameDatabase.get_database,["mapgen",mapgen_id])
+      mapgen_object = mapgen_tinymap["object"]
+      look_for_items_list = ~w/place_loot place_items/
+
+      loot =  Enum.find(look_for_items_list, fn (i) ->
+        mapgen_object[i] != nil
+      end)
+      if loot != nil do
+        random_point_of_interest = mapgen_object[loot]
+        |> Enum.shuffle |> Enum.random()
+        item_or_group =  Enum.find(~w/group item/, fn (group) ->
+          random_point_of_interest[group] != nil
+        end)
+        continue_searching({random_point_of_interest["chance"], random_point_of_interest[item_or_group]})
+      else
+        {:error, "There is nothing worth searching here!"}
+      end
+    end
+
+  def continue_searching(loot_object) do
     if  length(User.get(:items)) < @item_limit do
       {reason, energy_msg}  = User.verify_energy(1)
       if reason == :ok do
@@ -53,6 +125,8 @@ defmodule GameItems do
     #TODO allow theuser to succeed searching only a few times in the same tinymap
     #Restricting his searching for a few hours
     #Need to figure out a better algorithm out of these ideas
+    Do 2 random verifications? One from the place_loot group/item object "chance"
+    And the second from the item itself?
 
     1. I suppose the chance should be taken for all items and  add each success to a list
     Then just take that one by random out of that list
@@ -74,49 +148,58 @@ defmodule GameItems do
     #For example guns_pistol_common have 5% while things in bed 90%
     #This means that we also need to do a randomness
     """
-  def search_item( loot_object)  do
-      items =  DataStorage.get_nested(:game_database,["item_group",   loot_object["group"]])
-      |> Map.get("items")
-    #  Logger.debug "Items #{inspect items}"
-      item = Enum.random(items)
-      #TODO chance
-      {count_min, charges_min} = {nil,nil}
-
-    #TODO a case implementation would work best
-    #Since some item groups have other groups.......(INCEPTION!)
-      if is_list(item) do
-        [item_id, chance] =  item
-      else
-        #Probably a map  like    {"item": "fish_pickled", "prob":  6, "charges": 2, "container-item": "jar_glass_sealed"},
-        #TODO Should package it in the container..?
-        #rand(chages-min,charges-max) rand(count-min, count-max)
-        #And other possibilities
-        %{"item" => item_id, "prob" => chance } = item
-        {charges_min, charges_max}  = {item["charges-min"] , item["charges-max"]}
-        {count_min, count_max} = {item["count-min"], item["count-max"]}
-
-      end
-    #  Logger.debug "item #{item_id} chance #{chance}"
-      cond do
-        !is_nil(count_min) -> count = rand(count_min,count_max)
-        !is_nil(charges_min) -> count = rand(charges_min,charges_max)
-        true -> count =1
-      end
+  def search_item({chance, group_name})  do
+    item_list =  DataStorage.get_nested(:game_database,["item_group", group_name])
+    if item_list != nil do
+      item = item_list |> Map.get("items") |> Enum.random(item_list)
       if GameUtilities.rand(1,100) >= (100 - chance) do
-      #  TODO count
-        name = GameDatabase.get_name(item_id)
-        item_for_inventory = {item_id, name, count}
-        User.set(:items, User.get(:items) ++ [item_for_inventory])
-        User.incr(:experience,1)
-        ##{IO.ANSI.format([:bright,loot_object["group"]])
-        #TODO inform user what he found
-        search_text = "While searching through the <strong>#{loot_object["group"]}</strong>
-         you've managed to find one <strong>#{name}</strong>! +1 XP, -1 energy"
-
-        {:ok, item_id , String.replace(search_text, "\n"," ")}
+        search_item_final(item,group_name)
       else
         search_failed()
       end
+    else
+      #Place_loot has  "group" and "item" but we ignore the later
+      search_failed()
+    end
+  end
+
+  def search_item_final(item,group_name) do
+    {count_min, charges_min} = {nil,nil}
+  #TODO a case implementation would work best
+  #Since some item groups have other groups.......(INCEPTION!)
+    if is_list(item) do
+      [item_id, chance] =  item
+    else
+      #Probably a map  like    {"item": "fish_pickled", "prob":  6, "charges": 2, "container-item": "jar_glass_sealed"},
+      #TODO Should package it in the container..?
+      #rand(chages-min,charges-max) rand(count-min, count-max)
+      #And other possibilities
+      %{"item" => item_id, "prob" => chance } = item
+      {charges_min, charges_max}  = {item["charges-min"] , item["charges-max"]}
+      {count_min, count_max} = {item["count-min"], item["count-max"]}
+
+    end
+  #  Logger.debug "item #{item_id} chance #{chance}"
+    cond do
+      !is_nil(count_min) -> count = rand(count_min,count_max)
+      !is_nil(charges_min) -> count = rand(charges_min,charges_max)
+      true -> count =1
+    end
+    if GameUtilities.rand(1,100) >= (100 - chance) do
+    #  TODO count
+      name = GameDatabase.get_name(item_id)
+      item_for_inventory = {item_id, name, count}
+      User.set(:items, User.get(:items) ++ [item_for_inventory])
+      User.incr(:experience,1)
+      ##{IO.ANSI.format([:bright,loot_object["group"]])
+      #TODO inform user what he found
+      search_text = "While searching through the <strong>#{group_name}</strong>
+       you've managed to find one <strong>#{name}</strong>! +1 XP, -1 energy"
+
+      {:ok, item_id , String.replace(search_text, "\n"," ")}
+    else
+      search_failed()
+    end
   end
 
   def search_failed() do
@@ -230,7 +313,7 @@ defmodule GameItems do
       case GameItems.find_item(item_name) do
         {:found, {item_id, item_name, _count} } ->
             item_info = GameDatabase.get_item_info(item_id)
-            IO.puts "You are examining #{item_name}:"
+            Logger.debug "You are examining #{item_name}:"
             examine_item_type(item_info)
         #    case GameItems.use_item(item) do
       #        {:ok, msg} ->   IO.ANSI.format([:green, msg]) |> IO.puts

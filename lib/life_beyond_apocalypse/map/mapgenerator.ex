@@ -547,12 +547,13 @@ Regional_map_settings is full of wonderful ideas.. to implement in the future
       {new_x,new_y} = calc_x_y(x,y,max_x,max_y+5)
     #  road_list = road_list()
       tile_name =  get(map.map, x-1, y-1)
+      #TODO fix road and "unknown" tiles
       tile_name = case tile_name  do
         "road" -> "mall_a_27"
         "#" -> Enum.random(~w/orchard forest/)
         _  -> tile_name
       end
-      Logger.debug "Tilename #{tile_name} at #{x},#{y}"
+    #  Logger.debug "Tilename #{tile_name} at #{x},#{y}"
 
       {mapgen_id, tinymap}  = Tinymap.create_random_tinymap(tile_name)
       tile_map  = %{ type: tile_name, tinymap: tinymap, mapgen_id: mapgen_id}

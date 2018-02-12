@@ -11,34 +11,35 @@ defmodule Tinymap do
   """
   def examine_local_tinymap() do
     #TODO verify energy.. decrease eenrgy
-    {reason, tinymap_tile} =  return_tile_info_for_user()
-    if :ok == reason do
+    tinymap_tile  = return_tile_info_for_user()
+  #  {reason, tinymap_tile} =  return_tile_info_for_user()
+  #  if :ok == reason do
       examination_report(tinymap_tile)
-    else
-      IO.puts tinymap_tile
-    end
+#    else
+#      IO.puts tinymap_tile
+#    end
   end
 
-  def examination_report(tinymap_tile) do
+  def examination_report(%{mapgen_id: mapgen_id, tinymap: tinymap} = tinymap_tile) do
+    drawing = tinymap.rows   |> draw_tile()
+    mapgen_tinymap = DataStorage.get_nested(GameDatabase.get_database, ["mapgen",mapgen_id])
 
-    drawing = get_in(tinymap_tile, ["object","rows"])
-    |> draw_tile()
-  #  IO.puts "Hey Dude! #{inspect tinymap_tile} \n\n #{drawing}"
-
-    describe(tinymap_tile) |> IO.puts
+    #describe and show_loot both have
+    # tinymap_tile ... need to send both & get the best one
+    describe(mapgen_tinymap, tinymap_tile) |> IO.puts
     IO.write drawing
     #TODO draw the "set" points
     #TODO place loot..
     #Todo search loot:)
-    show_loot(tinymap_tile) |> List.to_string |> IO.write
+    show_loot(mapgen_tinymap,tinymap_tile) |> IO.write
   end
 
   def return_tile_info_for_user() do
     #TODO verify energy.. decrease eenrgy
     %{x: x, y: y} = User.get(~w/x y/a)
     tinymap = DataStorage.get_nested(:game_map, [:tinymap])
-      |>   get(x-1,y-1) |> Map.get(:tinymap)
-      {:ok, tinymap}
+      |>   get(x-1,y-1) # |> Map.get(:tinymap)
+      tinymap
   #  get_tinymap_tile(tinymap)
   end
 
@@ -58,33 +59,46 @@ defmodule Tinymap do
     Add a newline at the end of each line
   """
   def draw_tile(tile_data) do
-    tile_data |> Enum.map(fn (x) -> x<> "\n" end)
+    tile_data |> Enum.map(fn (x) -> x <> "\n" end)
     # |> Enum.map(fn (x) -> x<> "\n" end) |> IO.puts
     #  |> Enum.map(fn (x) -> List.insert_at(x,-1,"\n") end)
   end
 
   #Ignore the chance.. it's used for finding
-  def show_loot(tile) do
-    loot_big = [get_in(tile,["object","place_loot"]), get_in(tile,["object","place_items"])]
-    Enum.map(loot_big, fn loot ->
-    #TODO each of the object or group must have a beautiful name translation
-    if !is_nil(loot) do
-    {map, _acc} =  Enum.map_reduce(loot, 0, fn (object,acc) ->
-        group_or_item = if(object["group"] != nil, do:  object["group"], else: object["item"])
-        name = GameDatabase.get_name(group_or_item)
-        if(is_nil(name), do:
-          name = String.replace(group_or_item,"_", " ") |> String.capitalize,
-        else: name = name |> String.capitalize)
+  def show_loot(mapgen_tinymap, current_tinymap) do
+    loot_big = ~w/place_loot place_items/
+  searchable_list =  Enum.map(loot_big, fn loot_type ->
+      loot =  get_in(mapgen_tinymap,["object",loot_type])
+      allowed_searchable = current_tinymap[:tinymap][String.to_atom(loot_type)]
+      #TODO each of the object or group must have a beautiful name translation
+      if !is_nil(loot) do
+        {map, _acc} =  Enum.map_reduce(loot, 0, fn (object,acc) ->
+          if acc in allowed_searchable do
+            group_or_item = if(object["group"] != nil, do:  object["group"], else: object["item"])
+            name = GameDatabase.get_name(group_or_item)
+            if(is_nil(name), do:
+            name = String.replace(group_or_item,"_", " ") |> String.capitalize,
+          else: name = name |> String.capitalize)
 
-        x = get_object_xy(object,"x")
-        y = get_object_xy(object,"y")
+          x = get_object_xy(object,"x")
+          y = get_object_xy(object,"y")
           {~s/(#{IO.ANSI.format([:magenta, Integer.to_string(acc)])}). #{IO.ANSI.format([:green, name])} at (#{x},#{y}), /, acc+1}
+        else
+          {nil, acc+1}
+        end
       end)
-      Enum.into(map,["You can search the following points of interest: \n"])
-    else
-          "Nothing interesting to search..."
-    end
+        Enum.into(map,["You can search the following points of interest: \n"])
+      end
     end)
+    |> List.flatten
+    |> Enum.reject(fn (x) -> nil == x end)
+#    new_map = Enum.reject(map,fn (x) -> nil == x end)
+  #      Logger.debug "Full map #{inspect map} \n\n NEW MAP: \n #{inspect new_map}"
+    if searchable_list == [] do
+      "Nothing interesting to search here..."
+    else
+      searchable_list |> List.to_string
+    end
   end
 
   def get_object_xy(object, loc) do
@@ -99,18 +113,24 @@ defmodule Tinymap do
   @doc  """
   Describe the tile..
   """
-  def describe(tile) do
+  def describe(mapgen_tinymap,_current_tinymap) do
     #TODO The terrain name should be taken from overmap_terrain,json
-    [tile_terrain] = get_in(tile,["om_terrain"])
+    [tile_terrain] = get_in(mapgen_tinymap,["om_terrain"])
 
-    terrain = get_in(tile,["object","terrain"])
-    furniture =  get_in(tile,["object","furniture"])
+    terrain = get_in(mapgen_tinymap,["object","terrain"])
+    furniture =  get_in(mapgen_tinymap,["object","furniture"])
 
     description = if(!is_nil(furniture), do:
-     Map.merge(terrain,furniture )  , else: terrain )
-
+      Map.merge(terrain,furniture )  , else: terrain )
+      Logger.debug "Description #{inspect description}"
     tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
-      name = GameDatabase.get_name(id) |> String.capitalize
+
+        name = GameDatabase.get_name(id)
+        Logger.debug "Ok #{name} and id #{id}"
+        if(is_nil(name), do:
+          name = String.replace(id,"_", " ") |> String.capitalize,
+        else: name = name |> String.capitalize)
+
         acc <> "#{IO.ANSI.format([:blue, tile])} <= " <> name <> ", "
     end)
     tile_terrain_name = GameDatabase.get_name(tile_terrain) |> String.capitalize
@@ -255,7 +275,7 @@ defmodule Tinymap do
         |> random_items_from_list()
        place_loot = get_in(tinymap,["object","place_loot"])
         |> random_items_from_list()
-       new_tinymap = %{ rows: rows, place_loot: place_loot, place_items: place_items }
+       new_tinymap = %{ rows: rows,  place_loot: place_loot, place_items: place_items }
        {mapgen_id, new_tinymap}
   end
 

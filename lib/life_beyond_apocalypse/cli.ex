@@ -109,9 +109,13 @@ Aliases: info, look",
 
 #Great candidate for implementing a function which returns help
   defp execute_command(["search"]) do
-    IO.puts IO.ANSI.format([:red, "Correct syntax:
-    search <point of interest name or number>
-    search <x location> <y location>"])
+  #  IO.puts IO.ANSI.format([:red, "Correct syntax:
+  #  search <point of interest name or number>
+  #  search <x location> <y location>"])
+    case GameItems.search() do
+      {:ok, _item, msg} -> IO.puts IO.ANSI.format([:green, msg])
+      {:error, msg} -> IO.puts IO.ANSI.format([:red, msg])
+    end
     read_command()
   end
 
