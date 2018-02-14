@@ -1,0 +1,17 @@
+Command: <%= IO.ANSI.format([:green, "move <direction>"]) %>
+Valid directions are: <%= IO.ANSI.format([:italic, "(w)est, (e)ast, (s)outh, (n)orth, (nw)north-west,
+  (ne)north-east, (sw)south-west, (se)south-east"]) %>
+
+You can also use as specified on the numpad from 1 to 9:
+7  8  9  nw  n  ne
+ \ | /     \ | /
+  \|/       \|/
+4--5--6   w-- --e
+  /|\       /|\
+ / | \     / | \
+1  2  3  sw  s  se
+
+You also type the shorthand directions directly to move to the desired location.
+Example:
+> sw
+You have moved to x, y

@@ -68,6 +68,11 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
     DataStorage.start(:game_map, DataStorage, :new,
       MapGenerator.generate_new_map(name, x_size,y_size))
   end
+  def load_map(data) do
+    DataStorage.start(:game_map, DataStorage, :new, %{})
+    DataStorage.set_struct(:game_map,data)
+  end
+
   def get_map() do
       DataStorage.get_struct(:game_map)
   end
@@ -160,11 +165,12 @@ http://cddawiki.chezzo.com/cdda_wiki/index.php?title=Terrain_types
 
       def show_map() do
         %{x: x, y: y} = User.get(~W/x y/a)
+        map = get_map()
         sign_location = IO.ANSI.format_fragment([:light_magenta_background,
         :white,   :bright, :underline, "&",:reset, :white])
-        IO.puts "You're currently located at #{x},#{y} (#{sign_location}) "
-        %User{x: x, y: y} = User.get_struct()
-        map = get_map()
+        IO.puts "You're currently in #{map.name} located at #{x},#{y} (#{sign_location}) "
+    #    %User{x: x, y: y} = User.get_struct()
+
               IO.write  IO.ANSI.format([:white, set(map.mapdrawing,  x - 1, y - 1, sign_location  )])
     #    IO.write  set(map.mapdrawing,  x - 1, y - 1, text  )
       end

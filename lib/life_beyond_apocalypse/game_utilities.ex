@@ -147,8 +147,6 @@ defmodule GameUtilities do
       pick_color(color) |> String.to_atom
     end
 
-
-
 end
 
 defmodule FileExt do

@@ -18,18 +18,33 @@ require Logger
 
   @commands %{
     "quit" => "Quits the game",
-    "help" => "?<topic>? - Shows help screen and help topics about various commands",
-    "move" => "<location> - Moves to location. Valid options are: (w)est, (e)ast, (s)outh, (n)orth, (nw)north-west, (ne)north-east, (sw)south-west, (se)south-east ",
+    "help" => "?<topic>? - Shows this help screen and help topics about various commands",
+    "move" => "<location> - Moves to the specified location. Valid options are: (w)est, (e)ast, (s)outh, (n)orth, (nw)north-west, (ne)north-east, (sw)south-west, (se)south-east ",
     "map" => "Shows the map with your current location colored in",
-    "search" => "<point of interest> Search for an item in the point of interest as shown by the examine command.",
+    "search" => "?<point of interest>? -  Search for an item. You can specify a point of interest as shown by the examine command.",
     "inventory" => "Shows all the items in your inventory",
     "use" => "<item> - Uses the item from your inventory.",
     "drop" => "<item> - Drops a certain item from your inventory",
-    "examine" => "?<item|character|direction|keyword> -  Examines the given item. If you don't specify anything it examines the current location
-Aliases: info, look",
+    "examine" => "?<item|character|direction|keyword> -  Examines the given item, character, direction or keyword.
+  If you don't specify anything it examines the current location
+  Aliases: info, look, see",
+    "save" => "?<filename>? - Saves your current game to disk.",
+    "load" => "?<name>? - Shows you a list of all the saved game files you can load. Load a previously saved game.",
+    "new_game" => "Creates a new world game and a new character",
     "stats" => "Displays information about your stats",
   }
-  @command_list ~w/move map search inventory use examine look info see stats help drop quit/
+
+  @command_list ~w/move map search inventory use examine look info see stats help new_game load save drop quit/
+
+  @starting_options [
+  %{ :options => [1, "new", "create", "random"] , :text =>  "Create a new random map & character", function: :new },
+  %{ :options => [2, "load", "existing"] , :text =>  "Load an existing game" , function: :load},
+  ]
+
+  #################################################
+  # Utility functions
+  #################################################
+
   #  print_help_message()
   #{}"You should authenticate before doing anything else.	Available commands:
   #[color green]\[c\]onnect <username> ?<password>?[color reset] - to connect.
@@ -37,39 +52,157 @@ Aliases: info, look",
   #  user = %User{name: name}
   def main(_args) do
     IO.puts(@tag)
+    GameHelp.start()
     IO.puts IO.ANSI.format([:underline, :blue, "[*] Loading the game database..."])
     GameDatabase.load_database()
-    name =  read_text("[*] What is your name dear adventurer?")
-    User.start(name)
-    IO.puts IO.puts IO.ANSI.format([:underline, :magenta, "[*] Generating starting map [...]"])
-    GameMap.start_map()
-    %{max_x: max_x, max_y: max_y  } = GameMap.get_map()
-    User.set(%{x: GameUtilities.rand(1, max_x) , y: GameUtilities.rand(1,max_y) })
-    IO.puts IO.ANSI.format([:underline, :white, "[*] Placing the user in a random location.."])
-    IO.puts "[*] Welcome to LifeBeyondApocalypse #{name}!"
+    starting_options()
     read_command(IO.ANSI.format([:italic,"To find out more about a topic type", :magenta, " help <topic>"]))
   end
 
-  defp read_text(text) do
-     IO.gets("\n#{text} > ")
-     |> String.trim
-  end
 
-  defp read_command(text \\ "") do
-    IO.gets("\n#{text} > ")
-    |> String.trim
-    |> String.downcase
-    |> String.split(" ")
-    |>  execute_command
-  end
+    defp read_text(text) do
+       IO.gets("\n#{text} > ")
+       |> String.trim
+    end
 
-  defp execute_command(["quit"]) do
-    IO.puts "\nThanks for playing Life Beyond Apocalypse. Have a nice day!"
-  end
-  defp execute_command(["help"]) do
-    print_help_message()
+    defp read_command(text \\ "") do
+      IO.gets("\n#{text} > ")
+      |> String.trim
+      |> String.downcase
+      |> String.split(" ")
+      |>  execute_command
+    end
+
+
+  def starting_options() do
+    option = verify_valid_starting_options()
+    solution =  case option.function do
+      :new -> new_game()
+      :load ->
+        load_game()
+        name =  read_text("Just type the part of the saved game filename to load it.")
+        load_game(name)
+    end
+    #If there are no loads
+    if solution in [:error, :no_saves]  do
+      new_game()
+    end
     read_command()
   end
+
+  def valid_starting_options() do
+    text =  for map <- @starting_options do
+          map.text <> " (" <> Enum.join(map.options,", ") <> ")\n"
+    end
+    text =  ["[*] These are your options:\n" ] ++   text ++ [ "\n[*] What would you like to do? "]
+
+    read_text(   IO.ANSI.format([ :green, text ]))
+  end
+
+  def verify_valid_starting_options() do
+      user_option = valid_starting_options()
+      valid_option =  Enum.find(@starting_options, fn (o) ->
+        user_option in o.options
+      end)
+      if is_nil(valid_option) do
+        verify_valid_starting_options()
+      else
+        valid_option
+      end
+  end
+
+
+  #################################################
+  # Load   / Save
+  #################################################
+  def new_game() do
+    IO.puts "[*] Starting a new game"
+    name =  read_text(   IO.ANSI.format([:underline, :green, "What's your name dear adventurer? " ]))
+    User.start(name)
+
+    IO.puts IO.puts IO.ANSI.format([:underline, :magenta, "[*] Generating new map [...]"])
+    city_name = Faker.Address.city
+    GameMap.start_map(city_name)
+    %{max_x: max_x, max_y: max_y  } = GameMap.get_map()
+    User.set(%{x: GameUtilities.rand(1, max_x)  , y: GameUtilities.rand(1,max_y) })
+    IO.puts IO.ANSI.format([:underline, :white, "[*] Placing the user in a random location.."])
+    IO.puts "[*] Welcome to LifeBeyondApocalypse #{name}. You are now in #{city_name}. Happy Surviving & Have fun!"
+    :ok
+  end
+
+  def load_game(filename) do
+    case GameState.load_game(filename ) do
+      {:ok, msg} ->
+        IO.puts IO.ANSI.format([:green, msg])
+        :ok
+      {:error, msg} ->
+        IO.puts IO.ANSI.format([:red, msg])
+        :error
+    end
+  end
+
+  def load_game() do
+    all_saves = GameState.get_all_saves()
+    if all_saves != [] do
+      IO.puts "The following games can be loaded:"
+      for file <- all_saves do
+        IO.puts file
+      end
+      IO.puts "Type load <filename | user name> to load a game"
+      :ok
+    else
+      IO.puts "There are no games available to be loaded. Type 'new_game' to create a new game."
+      :no_saves
+    end
+  end
+
+  #################################################
+  # Execute Commands
+  #################################################
+
+   defp execute_command(["new_game"]) do
+     text = "Are you sure you want to start a new game?
+This will erase your current state if you haven't already saved it.
+Type yes,ok or true to create a new game."
+    response = read_text(text)
+    if String.match?(response,~r/y(es)|true|ok/iu) do
+      new_game()
+    end
+    read_command()
+  end
+
+
+  defp execute_command(["save"]) do
+    {:ok, msg} =  GameState.save_game()
+    IO.puts IO.ANSI.format([:green,msg])
+    read_command()
+  end
+  defp execute_command(["save" | filename]) do
+    {:ok, msg} =  GameState.save_game(List.to_string(filename) )
+      IO.puts IO.ANSI.format([:green, msg])
+    read_command()
+  end
+
+
+  defp execute_command(["load"]) do
+      load_game()
+      #  GameState.load_game()
+      read_command()
+    end
+
+
+  defp execute_command(["load" | filename]) do
+    load_game(filename)
+    read_command()
+  end
+
+
+  defp execute_command(["quit"]) do
+    msg = "\nThanks for playing Life Beyond Apocalypse. Have a nice day!\n"
+    IO.ANSI.format([:magenta,msg])
+    Kernel.exit(:normal)
+  end
+
 
   defp execute_command(["move" | location]) do
     GameMap.move(List.to_string(location) )
@@ -186,6 +319,24 @@ Aliases: info, look",
     And try to execute that. If it fails then we just return help
 
   """
+
+
+  defp execute_command(["help"]) do
+    print_help_message()
+    read_command()
+  end
+
+  defp execute_command(["help" | topic]) do
+    recv =  GameHelp.get_help_for_topic(topic |> List.to_string)
+
+    case recv  do
+      {:ok, msg} ->   IO.ANSI.format([:green, msg]) |> IO.puts
+      {:error, msg} ->   IO.ANSI.format([:red, msg]) |> IO.puts
+    end
+
+    read_command()
+  end
+
   defp execute_command(unknown) do
     [input_command | args] = unknown
     #IDEA prepopulate with a big list of possibilities for each one at the beginning of the game
@@ -211,6 +362,7 @@ Aliases: info, look",
   defp print_help_message() do
     IO.puts("\nLife Beyond Apocalypse supports the following commands:\n")
     @commands
+
     |> Enum.map(fn({command, description}) -> IO.puts("  #{command} - #{description}") end)
     IO.puts "Type help <command> to find out more about a specific command"
     IO.puts "You can also type abbreviations of the command. inv instead of inventory

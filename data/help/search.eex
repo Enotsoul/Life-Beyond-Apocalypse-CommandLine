@@ -1,0 +1,10 @@
+Command: <%= IO.ANSI.format([:green, "search ?<point of interest>?"]) %>
+?<point of interest>? is optional, when used it searches the points of interest as shown in the examine command.
+Search without a point of interest selects an arbitrary item group.
+
+While searching you will use 1 energy even if no item was found.
+* The chance to find an item depends on many factors:
+* Day/night
+* Building status
+
+In the beta stages it only looks at the item's uniqueness.

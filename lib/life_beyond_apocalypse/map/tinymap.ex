@@ -123,12 +123,12 @@ defmodule Tinymap do
     description = if(!is_nil(furniture), do:
       Map.merge(terrain,furniture )  , else: terrain )
     #  Logger.debug "Description #{inspect description}"
-    tile_description = Enum.reduce(description, "", fn ({tile,id}, acc) ->
+    tile_description = Enum.reduce(description, "", fn ({tile , id}, acc) ->
 
         name = GameDatabase.get_name(id)
-      #  Logger.debug "Ok #{name} and id #{id}"
+        Logger.debug "Ok #{name} and id #{id}"
         if(is_nil(name), do:
-          name = String.replace(id,"_", " ") |> String.capitalize,
+          name = String.replace(id,"_", " ") |> String.capitalize ,
         else: name = name |> String.capitalize)
 
         acc <> "#{IO.ANSI.format([:blue, tile])} <= " <> name <> ", "
