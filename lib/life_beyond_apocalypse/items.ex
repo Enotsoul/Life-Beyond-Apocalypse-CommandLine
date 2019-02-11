@@ -43,7 +43,7 @@ defmodule GameItems do
     Logger.debug  "Found looting #{inspect found_looting} "
     if chance != false do
       #The chance for searching a point of interest is 85% of the total chance..
-      continue_searching({round(chance*0.85), item_name})
+      continue_searching({round(chance*0.85), item_name}, :user)
     else
       {:error, "No such point of interest or nothing to be searched here. Type examine to review your options."}
     end
@@ -86,8 +86,16 @@ defmodule GameItems do
       Simple and clean method without the complications available with point of interests..
 
     """
-    def search()  do
-      %{mapgen_id: mapgen_id}  = Tinymap.return_tile_info_for_user()
+    def search() do
+      search_npc_or_user(:user)
+    end
+    def search_npc_or_user(is_user, npc \\ nil)  do
+      if is_user == :user do
+          %{mapgen_id: mapgen_id}  = Tinymap.return_tile_info_for_user()
+      else
+          %{mapgen_id: mapgen_id} =  NPC.tinymap_for_npc(npc)
+      end
+
       mapgen_tinymap =  DataStorage.get_nested(GameDatabase.get_database,["mapgen",mapgen_id])
       mapgen_object = mapgen_tinymap["object"]
       look_for_items_list = ~w/place_loot place_items/
@@ -101,18 +109,19 @@ defmodule GameItems do
         item_or_group =  Enum.find(~w/group item/, fn (group) ->
           random_point_of_interest[group] != nil
         end)
-        continue_searching({random_point_of_interest["chance"], random_point_of_interest[item_or_group]})
+        continue_searching({random_point_of_interest["chance"],
+         random_point_of_interest[item_or_group]}, is_user)
       else
         {:error, "There is nothing worth searching here!"}
       end
     end
 
-  def continue_searching(loot_object) do
+  def continue_searching(loot_object, is_user) when is_user == :user do
     if  length(User.get(:items)) < @item_limit do
       {reason, energy_msg}  = User.verify_energy(1)
       if reason == :ok do
-         User.use_energy(1)
-         search_item(loot_object)
+          User.use_energy(1)
+         search_item(loot_object,is_user)
        else
          {:error, energy_msg}
       end
@@ -120,6 +129,11 @@ defmodule GameItems do
       {:error, "Before you start searching again, be sure you drop something since you're already carrying too many things (30 items limit)"}
     end
   end
+
+  def continue_searching(loot_object,is_user) when is_user == :npc do
+       search_item(loot_object,is_user)
+  end
+
 
     @doc  """
     #TODO allow theuser to succeed searching only a few times in the same tinymap
@@ -148,12 +162,12 @@ defmodule GameItems do
     #For example guns_pistol_common have 5% while things in bed 90%
     #This means that we also need to do a randomness
     """
-  def search_item({chance, group_name})  do
+  def search_item({chance, group_name}, is_user)  do
     item_list =  DataStorage.get_nested(:game_database,["item_group", group_name])
     if item_list != nil do
-      item = item_list |> Map.get("items") |> Enum.random()
+      item = return_item_for_inception_group(group_name)
       if GameUtilities.rand(1,100) >= (100 - chance) do
-        search_item_final(item,group_name)
+        search_item_final(item,group_name,is_user)
       else
         search_failed()
       end
@@ -163,7 +177,57 @@ defmodule GameItems do
     end
   end
 
-  def search_item_final(item,group_name) do
+  @doc  """
+    For those times when a group is actually another group
+    that has it's items that are subitems aswell!
+    Just select a random group each time.
+    TODO for groups, a chance to search again? Or just for the last one
+  """
+  def return_item_for_inception_group(group_name) do
+    item_list =  DataStorage.get_nested(:game_database,["item_group", group_name])
+  #  item_distribution_collection
+    collection_name =  cond do
+      !is_nil(item_list["items"]) -> "items"
+      !is_nil(item_list["entries"]) -> "entries"
+      !is_nil(item_list["groups"]) -> "groups"
+    end
+    if Map.get(item_list,collection_name) != [] do
+      item = item_list |> Map.get(collection_name) |> Enum.random()
+    else
+      item = nil
+    end
+
+
+    #Some weird stuff containing "entries", each entry containing
+    #a distribution, group, collection
+    cond do
+      is_list(item)  ->      item
+      !is_nil(item["group"]) ->
+      #  Logger.info "FUN! #{group_name} contains item #{inspect item} which is actually a group!"
+        return_item_for_inception_group(item["group"])
+      true ->
+      #  Logger.warning  "OOPS.. what to do with #{inspect item} \n+++++++++"
+        item_distribution_collection(item)
+    end
+  end
+
+  def item_distribution_collection(item) do
+    cond do
+      !is_nil(item["distribution"]) ->
+        item_distribution_collection(item["distribution"] |>  Enum.random())
+      !is_nil(item["collection"]) ->
+          item_distribution_collection(item["collection"] |>  Enum.random())
+      !is_nil(item["item"]) -> item
+      !is_nil(item["group"]) -> return_item_for_inception_group(item["group"])
+      true -> item
+      end
+  end
+
+  def search_item_final(item,group_name, is_user) when is_nil(item) do
+    Logger.debug  "Group #{group_name} generated nil item for #{is_user} "
+    search_failed()
+  end
+  def search_item_final(item,group_name, is_user) do
     {count_min, charges_min} = {nil,nil}
   #TODO a case implementation would work best
   #Since some item groups have other groups.......(INCEPTION!)
@@ -174,10 +238,10 @@ defmodule GameItems do
       #TODO Should package it in the container..?
       #rand(chages-min,charges-max) rand(count-min, count-max)
       #And other possibilities
-      %{"item" => item_id, "prob" => chance } = item
-      {charges_min, charges_max}  = {item["charges-min"] , item["charges-max"]}
-      {count_min, count_max} = {item["count-min"], item["count-max"]}
-
+        {item_id, chance } = {item["item"], item["chance"]}
+        {charges_min, charges_max}  = {item["charges-min"] , item["charges-max"]}
+        {count_min, count_max} = {item["count-min"], item["count-max"]}
+        if(is_nil(chance), do: chance = 100 )
     end
   #  Logger.debug "item #{item_id} chance #{chance}"
     cond do
@@ -189,14 +253,16 @@ defmodule GameItems do
     #  TODO count
       name = GameDatabase.get_name(item_id)
       item_for_inventory = {item_id, name, count}
-      User.set(:items, User.get(:items) ++ [item_for_inventory])
-      User.incr(:experience,1)
+      if is_user == :user do
+        User.set(:items, User.get(:items) ++ [item_for_inventory])
+        User.incr(:experience,1)
+      end
       ##{IO.ANSI.format([:bright,loot_object["group"]])
       #TODO inform user what he found
       search_text = "While searching through the <strong>#{group_name}</strong>
        you've managed to find one <strong>#{name}</strong>! +1 XP, -1 energy"
 
-      {:ok, item_id , String.replace(search_text, "\n"," ")}
+      {:ok, item_for_inventory , String.replace(search_text, "\n"," ")}
     else
       search_failed()
     end
